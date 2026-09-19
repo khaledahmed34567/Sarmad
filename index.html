@@ -491,7 +491,7 @@ img{max-width:100%; display:block;}
       <div class="nav-search-results" id="navSearchResults"></div>
     </div>
     <a href="#/" data-close-menu>الرئيسية</a>
-    <a href="#tracks-anchor" id="tracksNavLink" data-close-menu>المسارات</a>
+    <a href="#/tracks" data-close-menu>المسارات</a>
     <a href="#/leaderboard" data-close-menu>المتصدرون</a>
     <a href="#/dashboard" data-close-menu>لوحتي</a>
     <a href="#/payment" data-close-menu>مدفوعاتي</a>
@@ -1292,21 +1292,10 @@ const appRoot = document.getElementById('appRoot');
 function navigate(path){ location.hash = '#/' + path; }
 document.querySelectorAll('[data-route]').forEach(el=>el.addEventListener('click', ()=>navigate('')));
 
-/* Jump-to-tracks links: on the home page this is a plain in-page anchor
-   scroll; from anywhere else it must navigate home first and then scroll,
-   otherwise the href's hash and the router's hash race each other and the
-   router ends up dispatching on a hash like "tracks-anchor" that matches no
-   route (→ 404). */
-function goToTracksSection(e){
-  if (e) e.preventDefault();
-  if (parseHash().name === 'home') {
-    document.getElementById('tracks-anchor')?.scrollIntoView({ behavior:'smooth' });
-  } else {
-    navigate('');
-    setTimeout(() => document.getElementById('tracks-anchor')?.scrollIntoView({ behavior:'smooth' }), 200);
-  }
-}
-document.getElementById('tracksNavLink')?.addEventListener('click', goToTracksSection);
+/* Historical note: the "المسارات" nav link used to be a same-page anchor
+   scroll combined with a data-route override, which caused a hash race
+   (see git history) — it's now a real #/tracks route instead, so no special
+   handling is needed here anymore. */
 
 /* ---- Mobile page-list (hamburger) menu ---- */
 const mobileMenu = document.getElementById('mobileMenu');
@@ -1353,8 +1342,20 @@ async function router(){
   const { name, param } = parseHash();
   window.scrollTo({ top:0, left:0, behavior:'instant' });
   startTopLoader();
+  // Leaving an in-progress quiz without submitting used to leave its
+  // countdown `setInterval` running forever in the background (it silently
+  // no-ops once quizState is cleared, but never actually gets cleared) —
+  // each abandoned quiz added one more timer ticking every second for the
+  // rest of the session, which both slowed the app down over time and could
+  // cause a stray auto-submit to fire later, making a finished exam look
+  // like it "replays". Clearing it here on every navigation fixes both.
+  if (quizState) {
+    clearInterval(quizState._timer);
+    quizState = null;
+  }
   try {
     if (name==='home') await renderHome();
+    else if (name==='tracks') await renderAllTracks();
     else if (name==='track') await renderTrack(param);
     else if (name==='course') await renderCourse(param);
     else if (name==='lecture') await renderLecture(param);
@@ -1418,7 +1419,7 @@ async function renderHome(){
     <p>مسارات برمجية متسلسلة، محاضرات ومهام ومشاريع عملية، واختبارات تفتح شهاداتها برمز تحقق رقمي فريد لكل طالب.</p>
     <div class="hero-cta">
       <button class="btn btn-primary" id="heroStart">ابدأ رحلتك</button>
-      <a href="#tracks-anchor" class="btn btn-ghost">تصفح المسارات</a>
+      <a href="#/tracks" class="btn btn-ghost">تصفح المسارات</a>
     </div>
     <div class="isnad">
       <div class="node done"><div class="dot"></div><span class="lbl">التسجيل</span></div><div class="thread"></div>
@@ -1560,6 +1561,21 @@ async function toggleBookmark(itemType, itemId, btnEl){
 }
 
 /* ---------------- TRACK ---------------- */
+/* ---------------- ALL TRACKS (dedicated page, not just a home anchor) ---------------- */
+async function renderAllTracks(){
+  appRoot.innerHTML = `<div class="wrap page-head">${backButton()}<h1>${icon('compass')} كل المسارات</h1></div>
+  <div class="wrap section"><div class="grid" id="allTracksGrid">${skeletonCards(6)}</div></div>`;
+  try {
+    const [tracks, bookmarkedIds] = await Promise.all([DB.listAll('Tracks'), getBookmarkedIds('track')]);
+    document.getElementById('allTracksGrid').innerHTML = tracks.length ? tracks.map(t=>`
+      <div class="card" onclick="navigate('track/${t.id}')">
+        <div class="thumb">${t.icon_url?`<img src="${escapeHtml(t.icon_url)}" alt="" loading="lazy" decoding="async">`:icon('book')}
+          ${bookmarkBtn('track', t.id, bookmarkedIds.has(String(t.id)))}</div>
+        <div class="body"><div class="kicker">مسار</div><h3>${escapeHtml(t.name_ar||'مسار')}</h3>${t.description_ar?`<p style="font-size:12.5px; color:var(--ink-soft); margin-top:6px;">${escapeHtml(t.description_ar)}</p>`:''}</div>
+      </div>`).join('') : emptyState('لا توجد مسارات بعد','سيتم إضافتها قريبًا');
+  } catch(e){ document.getElementById('allTracksGrid').innerHTML = emptyState('تعذّر تحميل المسارات', dbFriendlyError(e)); }
+}
+
 async function renderTrack(id){
   appRoot.innerHTML = `<div class="wrap page-head">${backButton()}${crumb([{label:'الرئيسية',href:'#/'},{label:'المسار'}])}<h1 id="trackTitle">...</h1></div>
   <div class="wrap section"><div class="grid" id="trackCourses">${skeletonCards(3)}</div></div>`;
