@@ -75,7 +75,21 @@ body{
     radial-gradient(640px 480px at 100% 12%, #C6A87D14, transparent 55%),
     radial-gradient(600px 500px at 15% 90%, #155FDB0a, transparent 55%);
   background-repeat:no-repeat; background-attachment:fixed;
+  /* Content protection: no text selection, no drag-out of images, anywhere
+     on the site — but inputs/textareas stay selectable or typing breaks. */
+  -webkit-user-select:none; user-select:none;
 }
+input, textarea, [contenteditable="true"]{ -webkit-user-select:text; user-select:text; }
+img, video{ -webkit-user-drag:none; }
+
+/* ---- Watermark: a fixed, repeating, low-opacity diagonal overlay of the
+   logged-in student's name — shown across lecture/task/quiz pages so a
+   leaked screenshot or recording can be traced back to whoever took it.
+   pointer-events:none so it never blocks clicks/typing underneath it. */
+#watermarkOverlay{position:fixed; inset:0; z-index:9000; pointer-events:none; overflow:hidden; display:none;}
+#watermarkOverlay.show{display:block;}
+#watermarkOverlay .wm-row{position:absolute; inset-inline-start:-20%; width:140%; display:flex; gap:60px; white-space:nowrap; transform:rotate(-30deg); opacity:.075; font-family:'AppSub'; font-size:14px; font-weight:700; color:#0E1116;}
+:root[data-theme="dark"] #watermarkOverlay .wm-row, :root:not([data-theme="light"]) #watermarkOverlay .wm-row{color:#fff;}
 /* consistent slim brand-tinted scrollbar everywhere (page + any inner scroll areas) */
 ::-webkit-scrollbar{width:9px; height:9px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -181,6 +195,9 @@ img{max-width:100%; display:block;}
 .section-head .see-all{font-size:13.5px; color:var(--emerald); flex-shrink:0; display:flex; align-items:center; gap:4px;}
 
 .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px;}
+.faq-item{border:1px solid var(--glass-border); border-radius:var(--radius-md); background:var(--glass-bg); padding:16px 18px; margin-bottom:10px;}
+.faq-item summary{cursor:pointer; font-weight:700; font-family:'AppTitles';}
+.faq-item p{margin-top:10px; color:var(--ink-soft); font-size:14px; line-height:1.7;}
 .filter-bar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:20px;}
 .filter-bar .cselect{min-width:150px;}
 .filter-bar input[type=text]{flex:1; min-width:180px; padding:11px 15px; border-radius:100px; border:1px solid var(--line); background:var(--canvas); color:var(--ink); font-size:14px; font-family:inherit;}
@@ -592,6 +609,7 @@ img{max-width:100%; display:block;}
 
 <div id="topLoader"></div>
 <main id="appRoot"></main>
+<div id="watermarkOverlay" aria-hidden="true"></div>
 
 <footer class="footer">
   <div class="wrap">
@@ -792,6 +810,8 @@ const ICONS = {
   copy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`,
   clock:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 3.2"/></svg>`,
   flame:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 3-3 4-3 8a3 3 0 0 0 6 0c1 1.5 1 3 1 3a6 6 0 1 1-9-8c0 1 .5 2 1.5 2C9 5 10 3 12 2z"/></svg>`,
+  copy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`,
+  share:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-3.8M8.6 13.4l6.8 3.8"/></svg>`,
   upload:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>`,
   user:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>`,
   book:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 5.5v15.5"/></svg>`,
@@ -1409,7 +1429,7 @@ fbAuth.onAuthStateChanged(async (user) => {
   // fires at least once (see the INIT block below), whether that resolves to
   // a guest or a restored session, rather than guessing and re-rendering.
   if (!user) {
-    if (session.user) { session.user = null; renderNavForUser(); }
+    if (session.user) { session.user = null; _watermarkBuilt = false; renderNavForUser(); }
     if (!_authResolved) { _authResolved = true; router(); }
     return;
   }
@@ -1486,6 +1506,36 @@ window.addEventListener('popstate', (e) => {
     authOverlay.classList.remove('open');
   }
 });
+/* ---- Content protection: watermark + global copy/right-click blocking.
+   None of this can stop a determined screen recording, but it removes the
+   easy paths (select+copy, right-click save, drag out an image) and — via
+   the watermark — makes a leaked screenshot traceable to whoever took it. ---- */
+let _watermarkBuilt = false;
+function buildWatermarkIfNeeded(){
+  if (_watermarkBuilt || !session.user) return;
+  const label = `${session.user.name || session.user.email || ''} — ${session.user.email || ''}`;
+  const row = `<div class="wm-row">${Array.from({length:8}).map(()=>escapeHtml(label)).join('&nbsp;&nbsp;&nbsp;&nbsp;')}</div>`;
+  const rows = Array.from({length:10}).map((_,i)=>`<div class="wm-row" style="top:${i*11}%">${Array.from({length:8}).map(()=>escapeHtml(label)).join('&nbsp;&nbsp;&nbsp;&nbsp;')}</div>`).join('');
+  document.getElementById('watermarkOverlay').innerHTML = rows;
+  _watermarkBuilt = true;
+}
+function toggleWatermark(shouldShow){
+  const el = document.getElementById('watermarkOverlay');
+  if (!el) return;
+  if (shouldShow && session.user) { buildWatermarkIfNeeded(); el.classList.add('show'); }
+  else el.classList.remove('show');
+}
+document.addEventListener('contextmenu', (e) => {
+  // still allow right-click inside a text input/textarea (paste, etc.)
+  const tag = (e.target.tagName||'').toLowerCase();
+  if (tag !== 'input' && tag !== 'textarea') e.preventDefault();
+});
+document.addEventListener('copy', (e) => { if (session.user) e.preventDefault(); });
+document.addEventListener('cut', (e) => { if (session.user) e.preventDefault(); });
+document.addEventListener('dragstart', (e) => {
+  if ((e.target.tagName||'').toLowerCase() === 'img') e.preventDefault();
+});
+
 async function router(){
   const { name, param } = parseHash();
   window.scrollTo({ top:0, left:0, behavior:'instant' });
@@ -1510,6 +1560,10 @@ async function router(){
     doneTopLoader();
     return;
   }
+  // Watermark shows only on the content pages worth protecting (lectures,
+  // tasks, quizzes) — not on the homepage or dashboard, where it would just
+  // be visual noise with nothing to trace back.
+  toggleWatermark(['lecture','task','quiz'].includes(name));
   try {
     if (name==='home') await renderHome();
     else if (name==='tracks') await renderAllTracks();
@@ -1570,9 +1624,13 @@ function render404(){
 function crumb(items){
   return `<div class="crumb">${items.map((it,i)=>`${i>0?icon('chevron'):''}${it.href?`<a href="${it.href}">${escapeHtml(it.label)}</a>`:`<span>${escapeHtml(it.label)}</span>`}`).join('')}</div>`;
 }
-function shareRow(path){
+function shareRow(path, title){
   const url = `${location.origin}${location.pathname}#/${path}`;
-  return `<div class="share-row"><button class="btn btn-ghost btn-sm" onclick="copyText('${url}')">${icon('link')} نسخ رابط مباشر</button></div>`;
+  const waUrl = `https://wa.me/?text=${encodeURIComponent((title?title+' — ':'')+url)}`;
+  return `<div class="share-row">
+    <button class="btn btn-ghost btn-sm" onclick="copyText('${url}')">${icon('copy')} نسخ رابط مباشر</button>
+    <a class="btn btn-ghost btn-sm" href="${waUrl}" target="_blank" rel="noopener">${icon('share')} مشاركة على واتساب</a>
+  </div>`;
 }
 function backButton(){
   return `<button class="btn btn-ghost btn-sm back-btn" onclick="history.back()">${icon('chevron')} رجوع</button>`;
@@ -1820,6 +1878,7 @@ async function renderAllCourses(){
 
 async function renderTrack(id){
   appRoot.innerHTML = `<div class="wrap page-head">${backButton()}${crumb([{label:'الرئيسية',href:'#/'},{label:'المسار'}])}<h1 id="trackTitle">...</h1>
+    ${shareRow('track/'+id)}
     <div id="trackPriceBadge" style="margin-top:14px;"></div></div>
   <div class="wrap section"><div class="grid" id="trackCourses">${skeletonCards(3)}</div></div>`;
   const tracks = await DB.listAll('Tracks');
@@ -1857,14 +1916,26 @@ async function loadTrackCertRequestBox(trackId, courses){
     });
     if (!allComplete) return;
     const trackLectures = allLectures.filter(l=>courses.some(c=>String(c.id)===String(l.course_id)));
-    const eligible = checkDeadlineEligibility(trackLectures, allTasks, progress);
+    let eligible = checkDeadlineEligibility(trackLectures, allTasks, progress);
+    let reason = eligible ? null : 'deadline';
+    if (eligible) {
+      const trackAssignmentTasks = allTasks.filter(t => t.type==='assignment' && trackLectures.some(l=>String(l.id)===String(t.lecture_id)));
+      if (trackAssignmentTasks.length) {
+        const mySubs = await DB.listAll('Submissions', 'user_id', session.user.uid);
+        const allApproved = trackAssignmentTasks.every(t => mySubs.some(s=>String(s.task_id)===String(t.id) && s.status==='approved'));
+        if (!allApproved) { eligible = false; reason = 'review'; }
+      }
+    }
     if (!eligible) {
       const host = document.getElementById('trackCertBox') || (() => {
         const el = document.createElement('div'); el.id='trackCertBox'; el.className='wrap section'; el.style.paddingTop='0';
         document.getElementById('trackCourses').closest('.wrap.section').insertAdjacentElement('afterend', el);
         return el;
       })();
-      host.innerHTML = `<div class="list-item" style="cursor:default; border-color:var(--danger);"><div class="num">${icon('lock')}</div><div class="info"><h4>فقدت أهلية شهادة هذا المسار</h4><span>تجاوزت الموعد النهائي لتسليم إحدى المحاضرات</span></div></div>`;
+      const msg = reason==='review'
+        ? { h:'بانتظار مراجعة الأدمن', s:'لسه في تسليم محتاج موافقة الأدمن قبل ما تقدر تطلب شهادة المسار' }
+        : { h:'فقدت أهلية شهادة هذا المسار', s:'تجاوزت الموعد النهائي لتسليم إحدى المحاضرات' };
+      host.innerHTML = `<div class="list-item" style="cursor:default; border-color:var(--danger);"><div class="num">${icon('lock')}</div><div class="info"><h4>${msg.h}</h4><span>${msg.s}</span></div></div>`;
       return;
     }
     const host = document.getElementById('trackCertBox') || (() => {
@@ -1924,6 +1995,10 @@ async function renderCourse(id){
     <div id="certRequestBox"></div>
   </div>
   <div class="wrap section"><div id="waitlistBox"></div><div class="list" id="lectureList"></div></div>
+  <div class="wrap section" id="courseFaqSection" style="display:none;">
+    <div class="section-head"><h2>${icon('quiz')} أسئلة شائعة</h2></div>
+    <div id="courseFaqList"></div>
+  </div>
   <div class="wrap section" style="padding-top:0;">
     <div class="section-head"><h2>${icon('star')} تقييمات الطلاب</h2></div>
     <div id="reviewForm"></div>
@@ -1955,7 +2030,19 @@ async function renderCourse(id){
   const courseProgressBarEl = document.getElementById('courseProgressBar');
   courseProgressBarEl.innerHTML = `<div style="width:${pct}%"></div>`;
   courseProgressBarEl.classList.toggle('complete', pct>=100 && allCourseTasks.length>0);
-  if (pct >= 100 && allCourseTasks.length) loadCertRequestBox(id, course, checkDeadlineEligibility(courseLectures, tasks, progress));
+  if (pct >= 100 && allCourseTasks.length) {
+    let eligible = checkDeadlineEligibility(courseLectures, tasks, progress);
+    let reason = eligible ? null : 'deadline';
+    if (eligible) {
+      const assignmentTasks = allCourseTasks.filter(t=>t.type==='assignment');
+      if (assignmentTasks.length) {
+        const mySubs = await DB.listAll('Submissions', 'user_id', session.user.uid);
+        const allApproved = assignmentTasks.every(t => mySubs.some(s=>String(s.task_id)===String(t.id) && s.status==='approved'));
+        if (!allApproved) { eligible = false; reason = 'review'; }
+      }
+    }
+    loadCertRequestBox(id, course, eligible, reason);
+  }
 
   if (courseLectures.length){
     document.getElementById('lectureList').innerHTML = courseLectures.map((l,i)=>{
@@ -1976,6 +2063,20 @@ async function renderCourse(id){
     loadWaitlistBox(id); // feature 6: only relevant while the course has no content yet
   }
   loadCourseReviews(id);
+  loadCourseFaq(id);
+}
+/* ---- New feature: course FAQ (admin-managed Q&A shown on the course page) ---- */
+async function loadCourseFaq(courseId){
+  try {
+    const faqs = await DB.listAll('FAQs', 'course_id', courseId);
+    if (!faqs.length) return;
+    document.getElementById('courseFaqSection').style.display = 'block';
+    document.getElementById('courseFaqList').innerHTML = faqs.map((f,i) => `
+      <details class="faq-item">
+        <summary>${escapeHtml(f.question_ar||'')}</summary>
+        <p>${escapeHtml(f.answer_ar||'')}</p>
+      </details>`).join('');
+  } catch(e){ console.error(e); }
 }
 
 /* ---- Per-lecture submission deadlines: if a lecture has a due_at and the
@@ -1999,7 +2100,7 @@ function checkDeadlineEligibility(lecturesInScope, tasks, progress){
 }
 
 /* ---- Certificate request (student-triggered, admin fulfils) ---- */
-async function loadCertRequestBox(courseId, course, eligible){
+async function loadCertRequestBox(courseId, course, eligible, reason){
   const box = document.getElementById('certRequestBox');
   if (!box || !session.user) return;
   if (course && course.has_certificate===false) { box.innerHTML = ''; return; }
@@ -2010,7 +2111,10 @@ async function loadCertRequestBox(courseId, course, eligible){
       return;
     }
     if (eligible===false) {
-      box.innerHTML = `<div class="list-item" style="cursor:default; margin-top:16px; border-color:var(--danger);"><div class="num">${icon('lock')}</div><div class="info"><h4>فقدت أهلية شهادة هذه الدورة</h4><span>تجاوزت الموعد النهائي لتسليم إحدى المحاضرات</span></div></div>`;
+      const msg = reason==='review'
+        ? { h:'بانتظار مراجعة الأدمن', s:'لسه في تسليم (واجب/مشروع) محتاج يوافق عليه الأدمن قبل ما تقدر تطلب الشهادة' }
+        : { h:'فقدت أهلية شهادة هذه الدورة', s:'تجاوزت الموعد النهائي لتسليم إحدى المحاضرات' };
+      box.innerHTML = `<div class="list-item" style="cursor:default; margin-top:16px; border-color:var(--danger);"><div class="num">${icon('lock')}</div><div class="info"><h4>${msg.h}</h4><span>${msg.s}</span></div></div>`;
       return;
     }
     box.innerHTML = `<div class="list-item" style="cursor:default; margin-top:16px; border-color:var(--gold);"><div class="num">${icon('badge')}</div><div class="info"><h4>أكملت الدورة!</h4><span>اطلب شهادتك الآن</span></div><button class="btn btn-gold btn-sm" id="requestCertBtn">${icon('badge')} طلب شهادة</button></div>`;
@@ -2450,8 +2554,8 @@ async function renderTask(id){
   else if (task.type==='assignment') {
     body.innerHTML = `<div class="panel">
       <h3 style="margin-bottom:10px;">${icon('doc')} المطلوب منك</h3>
-      <p style="color:var(--ink-soft); margin-bottom:18px; white-space:pre-wrap;">${escapeHtml(task.instructions||'')}</p>
-      <div id="assignmentSubmitBox"></div>
+      <p style="color:var(--ink-soft); margin-bottom:18px; white-space:pre-wrap;">${task.instructions ? escapeHtml(task.instructions) : 'لم يضع الأدمن وصفًا لهذه المهمة بعد.'}</p>
+      <div id="assignmentSubmitBox">${skeletonCards(1)}</div>
     </div>`;
     loadAssignmentSubmitBox(id);
   }
@@ -2539,7 +2643,7 @@ async function loadAssignmentSubmitBox(taskId){
       return;
     }
     renderAssignmentForm(taskId);
-  } catch(e){ console.error(e); box.innerHTML = emptyState('تعذّر التحميل',''); }
+  } catch(e){ console.error(e); box.innerHTML = emptyState('تعذّر تحميل صندوق التسليم', dbFriendlyError(e)); }
 }
 function renderAssignmentForm(taskId){
   const box = document.getElementById('assignmentSubmitBox');
@@ -3192,7 +3296,7 @@ async function renderCertificate(code){
           <button class="btn btn-primary btn-sm" onclick="downloadCertificateImage('${cardId}','${fileBase}')">${icon('doc')} تحميل كصورة</button>
           <button class="btn btn-primary btn-sm" onclick="downloadCertificatePdf('${cardId}','${fileBase}')">${icon('doc')} تحميل PDF</button>
           <a class="btn btn-ghost btn-sm" href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}" target="_blank" rel="noopener">مشاركة على LinkedIn</a>
-          <button class="btn btn-ghost btn-sm" onclick="copyText('${verifyUrl}')">${icon('link')} نسخ الرابط</button>
+          <button class="btn btn-ghost btn-sm" onclick="copyText('${verifyUrl}')">${icon('copy')} نسخ الرابط</button>
         </div>
       </div>`;
       return;
@@ -3247,7 +3351,7 @@ async function renderCertificate(code){
         <button class="btn btn-primary btn-sm" onclick="downloadCertificatePdf('${primaryCardId}','${fileBase}')">${icon('doc')} ${chrome.pdf}</button>`}
         <a class="btn btn-ghost btn-sm" href="${linkedinUrl}" target="_blank" rel="noopener">${chrome.shareLi}</a>
         <a class="btn btn-ghost btn-sm" href="${whatsappUrl}" target="_blank" rel="noopener">${chrome.shareWa}</a>
-        <button class="btn btn-ghost btn-sm" onclick="copyText('${verifyUrl}')">${icon('link')} ${chrome.copy}</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyText('${verifyUrl}')">${icon('copy')} ${chrome.copy}</button>
       </div>
     </div>`;
   } catch(e){ appRoot.innerHTML = emptyState('تعذّر التحقق من الشهادة', dbFriendlyError(e)); }
@@ -3383,7 +3487,7 @@ async function loadDashPanel(tab){
     });
     document.getElementById('logoutBtn').addEventListener('click', async ()=>{
       try { await fbAuth.signOut(); } catch(e){ console.error(e); }
-      session.user = null; renderNavForUser(); toast('تم تسجيل الخروج'); navigate('');
+      session.user = null; _watermarkBuilt = false; renderNavForUser(); toast('تم تسجيل الخروج'); navigate('');
     });
   }
 }
