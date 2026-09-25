@@ -299,27 +299,21 @@ img{max-width:100%; display:block;}
 .audio-play-btn:active{transform:scale(.92);}
 .audio-progress-wrap{flex:1; min-width:0;}
 .audio-progress-bar{position:relative; height:8px; background:rgba(255,255,255,.15); border-radius:100px; cursor:pointer;}
-.audio-progress-fill{position:absolute; inset-inline-start:0; top:0; height:100%; background:var(--emerald); border-radius:100px; width:0%; pointer-events:none;}
-.audio-progress-knob{position:absolute; top:50%; inset-inline-start:0%; width:14px; height:14px; background:#fff; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 1px 4px rgba(0,0,0,.4); pointer-events:none;}
+/* Physical `left` on purpose, not inset-inline-start: the JS positions the
+   fill/knob by setting .style.left directly. In this RTL page, a CSS rule
+   using the logical inset-inline-start resolves to `right`, and a box that
+   has both `left` (from JS) and `right` (from CSS) set is "over-constrained"
+   — the spec has `right` win in RTL, so the JS updates were silently
+   ignored and the bar never appeared to move. The player is also forced
+   dir="ltr" below so this stays unambiguous. */
+.audio-progress-fill{position:absolute; left:0; top:0; height:100%; background:var(--emerald); border-radius:100px; width:0%; pointer-events:none;}
+.audio-progress-knob{position:absolute; top:50%; left:0%; width:14px; height:14px; background:#fff; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 1px 4px rgba(0,0,0,.4); pointer-events:none;}
 .audio-time{display:flex; justify-content:space-between; margin-top:8px; font-family:'AppSub'; font-size:11.5px; color:rgba(255,255,255,.65);}
-.audio-speed-btn{flex-shrink:0; background:rgba(255,255,255,.1); border:none; color:#fff; font-family:'AppSub'; font-size:12px; font-weight:700; padding:8px 12px; border-radius:100px; cursor:pointer;}
-.audio-speed-btn:active{background:var(--emerald);}
+.audio-speed-btn, .audio-rewind-btn{flex-shrink:0; background:rgba(255,255,255,.1); border:none; color:#fff; font-family:'AppSub'; font-size:12px; font-weight:700; padding:8px 12px; border-radius:100px; cursor:pointer;}
+.audio-speed-btn:active, .audio-rewind-btn:active{background:var(--emerald);}
+.audio-rewind-btn{display:flex; align-items:center; gap:4px; font-size:11px;}
+.audio-rewind-btn svg{width:16px; height:16px;}
 @media(max-width:480px){ .audio-player{flex-wrap:wrap; padding:16px;} .audio-speed-btn{order:3; width:100%; margin-top:6px;} }
-/* Custom audio player — replaces the tiny default browser <audio> bar with
-   something that matches the platform's look and is actually easy to spot
-   and use, plus adds anti-skip, speed control, and resume-from-last-spot. */
-.audio-player{display:flex; align-items:center; gap:16px; background:linear-gradient(135deg,#0E1116,#1a1f29); border-radius:var(--radius-lg); padding:22px 24px; box-shadow:var(--shadow-lift); margin-bottom:24px; color:#fff;}
-.audio-play-btn{flex-shrink:0; width:52px; height:52px; border-radius:50%; background:var(--emerald); border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .15s ease;}
-.audio-play-btn:active{transform:scale(.92);}
-.audio-play-btn svg{width:22px; height:22px;}
-.audio-progress-wrap{flex:1; min-width:0;}
-.audio-progress-bar{position:relative; height:6px; border-radius:100px; background:rgba(255,255,255,.18); cursor:pointer;}
-.audio-progress-fill{position:absolute; inset-inline-start:0; top:0; height:100%; width:0%; background:var(--emerald); border-radius:100px; transition:width .1s linear;}
-.audio-progress-bar .audio-progress-knob{position:absolute; top:50%; width:12px; height:12px; border-radius:50%; background:#fff; transform:translate(-50%,-50%); left:0%; box-shadow:0 0 0 3px rgba(255,255,255,.15);}
-.audio-time{display:flex; justify-content:space-between; font-family:'AppSub'; font-size:11.5px; color:rgba(255,255,255,.65); margin-top:8px;}
-.audio-speed-btn{flex-shrink:0; font-family:'AppSub'; font-size:12.5px; font-weight:700; background:rgba(255,255,255,.12); border:none; color:#fff; border-radius:100px; padding:8px 14px; cursor:pointer; white-space:nowrap;}
-.audio-speed-btn:active{transform:scale(.95);}
-@media(max-width:480px){ .audio-player{padding:16px; gap:10px;} .audio-play-btn{width:44px; height:44px;} .audio-play-btn svg{width:18px; height:18px;} }
 .player-frame video, .player-frame iframe{width:100%; display:block; aspect-ratio:16/9; border:none;}
 .player-frame audio{width:100%; padding:24px;}
 .pdf-frame{width:100%; height:76vh; border:none; display:block;}
@@ -379,8 +373,9 @@ img{max-width:100%; display:block;}
 /* ---- Track completion certificate (medal badge template) ---- */
 .cert-track-body{display:flex; align-items:center; gap:28px; flex:1;}
 .cert-track-medal{position:relative; width:120px; height:150px; flex-shrink:0;}
-.cert-track-medal-ring{width:120px; height:120px; border-radius:50%; background:#fff; border:6px solid #C6A87D; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(0,0,0,.08); position:relative; z-index:2;}
-.cert-track-medal-ribbon-l,.cert-track-medal-ribbon-r{position:absolute; bottom:-6px; width:26px; height:46px; background:#C6A87D; z-index:1;}
+.cert-track-medal-ring{width:120px; height:120px; border-radius:50%; background:#fff; border:6px solid #C6A87D; background-image:linear-gradient(145deg,#fff,#F7F1E4); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(198,168,125,.35), inset 0 0 0 3px rgba(198,168,125,.2); position:relative; z-index:2; overflow:hidden;}
+.cert-track-medal-ring img{width:80%; height:80%; object-fit:contain;}
+.cert-track-medal-ribbon-l,.cert-track-medal-ribbon-r{position:absolute; bottom:-6px; width:26px; height:46px; background:linear-gradient(180deg,#C6A87D,#a8895f); z-index:1;}
 .cert-track-medal-ribbon-l{left:22px; transform:skewX(8deg); clip-path:polygon(0 0,100% 0,100% 75%,50% 100%,0 75%);}
 .cert-track-medal-ribbon-r{right:22px; transform:skewX(-8deg); clip-path:polygon(0 0,100% 0,100% 75%,50% 100%,0 75%);}
 .cert-track-text{flex:1; min-width:0;}
@@ -812,6 +807,7 @@ const ICONS = {
   flame:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 3-3 4-3 8a3 3 0 0 0 6 0c1 1.5 1 3 1 3a6 6 0 1 1-9-8c0 1 .5 2 1.5 2C9 5 10 3 12 2z"/></svg>`,
   copy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`,
   share:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-3.8M8.6 13.4l6.8 3.8"/></svg>`,
+  rewind10:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 2.6 5.9"/><path d="M4 6v5h5"/></svg>`,
   upload:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>`,
   user:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>`,
   book:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 5.5v15.5"/></svg>`,
@@ -1960,23 +1956,38 @@ function openTrackCertRequestModal(trackId){
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal">
     <div class="modal-head"><h2>${icon('badge')} طلب شهادة المسار</h2><button class="modal-close" id="trackCertModalClose">✕</button></div>
-    <div class="field"><label>الاسم بالعربي</label><input type="text" id="trackCertName" value="${escapeHtml(session.user.name||'')}" placeholder="اكتب اسمك بالعربي"></div>
+    <div class="field"><label>لغة الشهادة</label>
+      ${cselectHtml('trackCertReqLang', [{value:'ar',label:'عربي'},{value:'en',label:'إنجليزي'},{value:'both',label:'الاثنين معًا'}], 'ar')}
+    </div>
+    <div class="field" id="trackCertNameArField"><label>الاسم بالعربي (للشهادة العربية)</label><input type="text" id="trackCertNameAr" value="${escapeHtml(session.user.name||'')}" placeholder="اكتب اسمك بالعربي"></div>
+    <div class="field" id="trackCertNameEnField"><label>Name in English (for the English certificate)</label><input type="text" id="trackCertNameEn" value="${escapeHtml(session.user.nameEn||'')}" placeholder="Your name in English"></div>
     <p style="font-size:12.5px; color:var(--ink-soft); margin-bottom:16px;">سيتم مراجعة طلبك من الإدارة، وسيصلك إشعار فور اعتماد الشهادة.</p>
     <button class="btn btn-primary btn-block" id="trackCertSubmitBtn">إرسال الطلب</button>
   </div>`;
   document.body.appendChild(overlay);
+  initCustomSelects(overlay);
   const close = () => overlay.remove();
   overlay.addEventListener('click', e => { if (e.target===overlay) close(); });
   overlay.querySelector('#trackCertModalClose').addEventListener('click', close);
+  function syncNameFields(){
+    const lang = cselectValue('trackCertReqLang');
+    overlay.querySelector('#trackCertNameArField').style.display = lang==='en' ? 'none' : 'block';
+    overlay.querySelector('#trackCertNameEnField').style.display = lang==='ar' ? 'none' : 'block';
+  }
+  overlay.querySelector('#trackCertReqLang').addEventListener('cselect-change', syncNameFields);
+  syncNameFields();
   overlay.querySelector('#trackCertSubmitBtn').addEventListener('click', async () => {
-    const nameAr = overlay.querySelector('#trackCertName').value.trim();
-    if (!nameAr){ toast('اكتب اسمك بالعربي'); return; }
+    const lang = cselectValue('trackCertReqLang');
+    const nameAr = overlay.querySelector('#trackCertNameAr').value.trim();
+    const nameEn = overlay.querySelector('#trackCertNameEn').value.trim();
+    if (lang!=='en' && !nameAr){ toast('اكتب اسمك بالعربي'); return; }
+    if (lang!=='ar' && !nameEn){ toast('Enter your name in English'); return; }
     const btn = overlay.querySelector('#trackCertSubmitBtn');
     btn.disabled = true; btn.textContent = '...جارٍ الإرسال';
     try {
       await DB.create('Certificates', {
         user_id: session.user.uid, user_email: session.user.email, track_id: trackId, cert_type:'track',
-        full_name_ar: nameAr, language:'ar',
+        full_name_ar: nameAr, full_name_en: nameEn, language: lang,
         status:'pending', verify_code:'', issued_at:'', created_at:new Date().toISOString(),
       });
       toast('تم إرسال طلب شهادة المسار، بانتظار اعتماد الإدارة');
@@ -2054,7 +2065,7 @@ async function renderCourse(id){
       })();
       return `<div class="list-item ${lDone?'done':''} ${locked?'locked':''}" ${locked?'':`onclick="navigate('lecture/${l.id}')"`}>
         <div class="num">${lDone?icon('check'):(i+1)}</div>
-        <div class="info"><h4>${escapeHtml(l.title_ar||'محاضرة')}</h4><span>${lTasks.length} مهمة</span></div>
+        <div class="info"><h4>${escapeHtml(l.title_ar||'محاضرة')}</h4><span>${lTasks.length} مهمة${l.estimated_minutes ? ` · ~${l.estimated_minutes} دقيقة` : ''}</span></div>
         <div class="status-icon">${locked?icon('lock'):icon('chevron')}</div>
       </div>`;
     }).join('');
@@ -2432,6 +2443,7 @@ function initCustomAudioPlayer(task, audioId){
   const curEl = document.getElementById(audioId+'_cur');
   const durEl = document.getElementById(audioId+'_dur');
   const speedBtn = document.getElementById(audioId+'_speed');
+  const rewindBtn = document.getElementById(audioId+'_rewind');
   if (!audio) return;
 
   let maxPlayed = 0;
@@ -2475,6 +2487,9 @@ function initCustomAudioPlayer(task, audioId){
     audio.playbackRate = speeds[speedIdx];
     speedBtn.textContent = speeds[speedIdx]+'x';
   });
+  // rewinding is always allowed — only forward-seeking past what's been
+  // actually heard is blocked, so a plain -10s jump never needs the guard
+  rewindBtn.addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 10); });
   // Feature: persist listening position periodically + on pause/unload, so
   // the resume-from-last-position feature above has something to read
   let lastSaved = 0;
@@ -2532,8 +2547,9 @@ async function renderTask(id){
   }
   else if (task.type==='audio') {
     const audioId = 'audioEl_'+task.id;
-    body.innerHTML = `<div class="audio-player">
+    body.innerHTML = `<div class="audio-player" dir="ltr">
       <button class="audio-play-btn" id="${audioId}_play">${icon('play')}</button>
+      <button class="audio-rewind-btn" id="${audioId}_rewind" title="رجوع 10 ثوان">${icon('rewind10')} 10</button>
       <div class="audio-progress-wrap">
         <div class="audio-progress-bar" id="${audioId}_bar"><div class="audio-progress-fill" id="${audioId}_fill"></div><div class="audio-progress-knob" id="${audioId}_knob"></div></div>
         <div class="audio-time"><span id="${audioId}_cur">0:00</span><span id="${audioId}_dur">0:00</span></div>
@@ -3184,38 +3200,44 @@ function certificateCardHtml(nameText, courseTitle, dateStr, verifyUrl, lang, ca
    "certifies that" line, red "has completed track" line, list of the
    courses finished inside the track, and an overall grade). Arabic only,
    per the platform's design. */
-function trackCertificateCardHtml(nameText, trackTitle, courseTitles, overallGrade, dateStr, verifyUrl, cardId){
+function trackCertificateCardHtml(nameText, trackTitle, courseTitles, overallGrade, dateStr, verifyUrl, cardId, lang){
+  const isEn = lang === 'en';
+  const dir = isEn ? 'ltr' : 'rtl';
+  const t = isEn
+    ? { line1:'This certifies that', line2:'has successfully completed the full track:', coursesLabel:'Completed courses:', gradeLabel:'Overall grade:', sig:'Signature', check:'Scan to verify' }
+    : { line1:'تشهد منصة سرمد بأن:', line2:'قد أتم بفضل الله مسار:', coursesLabel:'الدورات المكتملة:', gradeLabel:'التقدير العام:', sig:'التوقيع', check:'امسح للتحقق' };
   return `
-    <div class="cert-card cert-card-track" id="${cardId}" dir="rtl">
+    <div class="cert-card cert-card-track" id="${cardId}" dir="${dir}">
       <div class="cert-card-top">
         <img class="cert-wordmark-img" src="${BRAND_WORDMARK}" alt="sarmad" draggable="false" oncontextmenu="return false">
+        <span class="cert-card-date-top">${escapeHtml(dateStr||'')}</span>
       </div>
       <div class="cert-track-body">
         <div class="cert-track-medal">
           <div class="cert-track-medal-ring">
-            <img src="${BRAND_WORDMARK}" alt="sarmad" style="width:70%; height:auto;" draggable="false" oncontextmenu="return false">
+            <img src="${BRAND_STAMP}" alt="sarmad" draggable="false" oncontextmenu="return false">
           </div>
           <div class="cert-track-medal-ribbon-l"></div>
           <div class="cert-track-medal-ribbon-r"></div>
         </div>
         <div class="cert-track-text">
-          <div class="cert-track-line green">تشهد منصة سرمد بأن:</div>
+          <div class="cert-track-line green">${t.line1}</div>
           <div class="cert-card-filled">${escapeHtml(nameText||'')}</div>
-          <div class="cert-track-line red" style="margin-top:22px;">قد أتم بفضل الله مسار:</div>
+          <div class="cert-track-line red" style="margin-top:22px;">${t.line2}</div>
           <div class="cert-card-filled">${escapeHtml(trackTitle||'')}</div>
         </div>
       </div>
-      ${courseTitles && courseTitles.length ? `<div class="cert-track-courses"><strong>الدورات المكتملة:</strong> ${courseTitles.map(escapeHtml).join(' · ')}</div>` : ''}
-      ${overallGrade ? `<div class="cert-track-grade"><strong>التقدير العام:</strong> ${escapeHtml(overallGrade)}</div>` : ''}
+      ${courseTitles && courseTitles.length ? `<div class="cert-track-courses"><strong>${t.coursesLabel}</strong> ${courseTitles.map(escapeHtml).join(' · ')}</div>` : ''}
+      ${overallGrade ? `<div class="cert-track-grade"><strong>${t.gradeLabel}</strong> ${escapeHtml(overallGrade)}</div>` : ''}
       <div class="cert-card-footer">
         <div class="cert-card-sig">
           <img class="cert-card-sig-img" src="${BRAND_SIGNATURE}" alt="signature" draggable="false" oncontextmenu="return false">
           <div class="cert-card-sig-line"></div>
-          <span>التوقيع — ${dateStr||''}</span>
+          <span>${t.sig}</span>
         </div>
         <div class="cert-card-mark"><img src="${BRAND_STAMP}" alt="stamp" draggable="false" oncontextmenu="return false"></div>
         <div class="cert-card-qr-box">
-          <span>امسح للتحقق</span>
+          <span>${t.check}</span>
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(verifyUrl)}" alt="QR">
         </div>
       </div>
@@ -3286,15 +3308,32 @@ async function renderCertificate(code){
     const fileBase = `sarmad-certificate-${code}`;
 
     if (cert.cert_type === 'track') {
-      const trackTitle = (tracks.find(t=>t.id===cert.track_id)||{}).name_ar || 'مسار';
-      const cardId = 'certCardTrack';
-      appRoot.innerHTML = `<div class="wrap section" style="max-width:820px; margin:0 auto;" dir="rtl">
+      const certTrack = tracks.find(t=>t.id===cert.track_id) || {};
+      const trackTitle = certTrack.name_ar || certTrack.name_en || 'مسار';
+      const trackTitleEn = certTrack.name_en || certTrack.name_ar || 'Track';
+      const isEn = cert.language === 'en';
+      const both = cert.language === 'both';
+      const arCardId = 'certCardTrackAr', enCardId = 'certCardTrackEn';
+      const arDownloadRow = `<div class="share-row" style="justify-content:center; margin-top:10px;" dir="rtl">
+          <button class="btn btn-primary btn-sm" onclick="downloadCertificateImage('${arCardId}','${fileBase}-ar')">${icon('doc')} تحميل النسخة العربية (صورة)</button>
+          <button class="btn btn-primary btn-sm" onclick="downloadCertificatePdf('${arCardId}','${fileBase}-ar')">${icon('doc')} تحميل النسخة العربية (PDF)</button>
+        </div>`;
+      const enDownloadRow = `<div class="share-row" style="justify-content:center; margin-top:10px;" dir="ltr">
+          <button class="btn btn-primary btn-sm" onclick="downloadCertificateImage('${enCardId}','${fileBase}-en')">${icon('doc')} Download English (image)</button>
+          <button class="btn btn-primary btn-sm" onclick="downloadCertificatePdf('${enCardId}','${fileBase}-en')">${icon('doc')} Download English (PDF)</button>
+        </div>`;
+      const cardsHtml = both
+        ? `<div dir="rtl" style="text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:6px;">النسخة العربية — Arabic version</div>${trackCertificateCardHtml(cert.full_name_ar, trackTitle, cert.completed_courses||[], cert.overall_grade, dateStr, verifyUrl, arCardId, 'ar')}${arDownloadRow}
+           <div dir="ltr" style="text-align:center; font-size:12px; color:var(--ink-soft); margin:22px 0 6px;">English version</div>${trackCertificateCardHtml(cert.full_name_en, trackTitleEn, cert.completed_courses||[], cert.overall_grade, dateStr, verifyUrl, enCardId, 'en')}${enDownloadRow}`
+        : trackCertificateCardHtml(isEn?cert.full_name_en:cert.full_name_ar, isEn?trackTitleEn:trackTitle, cert.completed_courses||[], cert.overall_grade, dateStr, verifyUrl, isEn?enCardId:arCardId, isEn?'en':'ar');
+      const primaryCardId = isEn ? enCardId : arCardId;
+      appRoot.innerHTML = `<div class="wrap section" style="max-width:820px; margin:0 auto;" dir="${isEn?'ltr':'rtl'}">
         <div class="valid-badge" style="margin-bottom:16px;">${icon('check')} شهادة موثّقة</div>
-        ${trackCertificateCardHtml(cert.full_name_ar, trackTitle, cert.completed_courses||[], cert.overall_grade, dateStr, verifyUrl, cardId)}
+        ${cardsHtml}
         <p style="font-size:11.5px; color:var(--ink-soft); margin:16px 0; text-align:center;">رمز التحقق: ${escapeHtml(code)}</p>
         <div class="share-row" style="justify-content:center;">
-          <button class="btn btn-primary btn-sm" onclick="downloadCertificateImage('${cardId}','${fileBase}')">${icon('doc')} تحميل كصورة</button>
-          <button class="btn btn-primary btn-sm" onclick="downloadCertificatePdf('${cardId}','${fileBase}')">${icon('doc')} تحميل PDF</button>
+          ${both ? '' : `<button class="btn btn-primary btn-sm" onclick="downloadCertificateImage('${primaryCardId}','${fileBase}')">${icon('doc')} تحميل كصورة</button>
+          <button class="btn btn-primary btn-sm" onclick="downloadCertificatePdf('${primaryCardId}','${fileBase}')">${icon('doc')} تحميل PDF</button>`}
           <a class="btn btn-ghost btn-sm" href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(verifyUrl)}" target="_blank" rel="noopener">مشاركة على LinkedIn</a>
           <button class="btn btn-ghost btn-sm" onclick="copyText('${verifyUrl}')">${icon('copy')} نسخ الرابط</button>
         </div>
