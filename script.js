@@ -2753,6 +2753,12 @@ async function markTaskComplete(taskId){
 
 /* ---------------- QUIZ ---------------- */
 let quizState = null;
+function quizIsEssay(q){ return q && (q.type==='essay' || !(q.options||[]).length); }
+function quizOptionsHtml(q,qi){
+  if (quizIsEssay(q)) return `<textarea class="q-essay" data-q="${qi}" rows="5" style="width:100%; margin-top:8px;" placeholder="اكتب إجابتك هنا"></textarea>`;
+  return (q.options||[]).map((opt,oi)=>`
+        <label class="q-opt" data-q="${qi}" data-o="${oi}"><input type="radio" name="q${qi}" value="${oi}"><span>${escapeHtml(opt)}</span></label>`).join('');
+}
 async function renderQuiz(id){
   appRoot.innerHTML = `<div class="wrap page-head">${backButton()}${crumb([{label:'الرئيسية',href:'#/'},{label:'اختبار'}])}<h1 id="quizTitle">...</h1></div>
   <div class="wrap section" id="quizBody">${emptyState('جارٍ التحميل...','')}</div>`;
@@ -2831,12 +2837,11 @@ async function renderQuiz(id){
     return;
   }
 
-  quizState = { taskId:id, questions:quizData.questions||[], answers:{}, passPercent:quizData.pass_percent||75, secondsLeft:(quizData.time_limit_minutes||10)*60, attemptNo:sameTaskAttempts.length+1 };
+  quizState = { taskId:id, questions:quizData.questions||[], answers:{}, essays:{}, passPercent:quizData.pass_percent||75, secondsLeft:(quizData.time_limit_minutes||10)*60, attemptNo:sameTaskAttempts.length+1 };
   document.getElementById('quizBody').innerHTML = `
     <div class="quiz-head"><div>المحاولة ${quizState.attemptNo} من ${effectiveMax}</div><div class="quiz-timer" id="quizTimer">${icon('clock')}<span id="timerText"></span></div></div>
     <div id="quizQuestions">${quizState.questions.map((q,qi)=>`
-      <div class="q-card" dir="${isLikelyEnglish(q.q) ? 'ltr' : 'rtl'}"><h4>${qi+1}. ${escapeHtml(q.q)}</h4>${(q.options||[]).map((opt,oi)=>`
-        <label class="q-opt" data-q="${qi}" data-o="${oi}"><input type="radio" name="q${qi}" value="${oi}"><span>${escapeHtml(opt)}</span></label>`).join('')}</div>`).join('')}</div>
+      <div class="q-card" dir="${isLikelyEnglish(q.q) ? 'ltr' : 'rtl'}"><h4>${qi+1}. ${escapeHtml(q.q)}</h4>${quizOptionsHtml(q,qi)}</div>`).join('')}</div>
     <button class="btn btn-primary btn-block" id="submitQuizBtn">إرسال الإجابات</button>`;
 
   document.querySelectorAll('.q-opt').forEach(opt=>opt.addEventListener('click', ()=>{
@@ -2845,6 +2850,7 @@ async function renderQuiz(id){
     opt.classList.add('selected'); opt.querySelector('input').checked = true;
     quizState.answers[qi] = Number(opt.dataset.o);
   }));
+  document.querySelectorAll('.q-essay').forEach(t=>t.addEventListener('input', ()=>{ quizState.essays[t.dataset.q] = t.value; }));
   document.getElementById('submitQuizBtn').addEventListener('click', submitQuiz);
   startQuizTimer();
 }
@@ -2865,15 +2871,16 @@ function startQuizTimer(){
 async function submitQuiz(){
   if (!quizState) return;
   clearInterval(quizState._timer);
-  const total = quizState.questions.length || 1;
+  const mcqCount = quizState.questions.filter(q=>!quizIsEssay(q)).length;
   let correct = 0;
-  quizState.questions.forEach((q,qi) => { if (quizState.answers[qi] === q.correct) correct++; });
-  const score = Math.round(100*correct/total);
+  quizState.questions.forEach((q,qi) => { if (!quizIsEssay(q) && quizState.answers[qi] === q.correct) correct++; });
+  const score = mcqCount ? Math.round(100*correct/mcqCount) : 100;   // essay questions are reviewed by the admin, only MCQs are auto-graded
+  const essayList = quizState.questions.map((q,qi)=>({ q:q.q, answer:(quizState.essays[qi]||'').trim(), essay:quizIsEssay(q) })).filter(x=>x.essay && x.answer).map(x=>({ q:x.q, answer:x.answer }));
   const passed = score >= quizState.passPercent;
   let nextButtonHtml = `<button class="btn btn-primary" onclick="history.back()">متابعة</button>`;
   try {
     if (session.user){
-      await DB.create('QuizAttempts', { user_id:session.user.uid, user_email:session.user.email, task_id:quizState.taskId, score, passed:passed?'TRUE':'FALSE', attempt_no:quizState.attemptNo, created_at:new Date().toISOString() });
+      await DB.create('QuizAttempts', { user_id:session.user.uid, user_email:session.user.email, task_id:quizState.taskId, score, passed:passed?'TRUE':'FALSE', attempt_no:quizState.attemptNo, created_at:new Date().toISOString(), ...(essayList.length ? { essays:essayList, needs_review:true } : {}) });
       if (passed) {
         await markTaskComplete(quizState.taskId);
         awardPoints(20); // on top of the 10 markTaskComplete already awards — passing a quiz is worth more than a plain task
@@ -2898,6 +2905,7 @@ async function submitQuiz(){
       ${icon(passed?'badge':'quiz')}
       <div class="score">${score}%</div>
       <p style="color:var(--ink-soft); margin-top:10px;">${passed ? 'أحسنت! لقد اجتزت الاختبار' : `تحتاج ${quizState.passPercent}% على الأقل للنجاح`}</p>
+      ${essayList.length ? '<p style="color:var(--brand,#155FDB); margin-top:6px;">إجاباتك المقالية وصلت للإدارة للمراجعة</p>' : ''}
       <div style="margin-top:24px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
         ${passed ? nextButtonHtml : `<button class="btn btn-ghost" onclick="renderQuiz('${quizState.taskId}')">إعادة المحاولة</button>`}
       </div>
