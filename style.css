@@ -631,3 +631,26 @@ body.printing-accred #printHost .accred-card{width:210mm; aspect-ratio:auto; hei
    descriptions, FAQ answers, notices, task instructions, etc.) — additive
    only, doesn't change layout of single-line text. ---- */
 p, .hint, li, .info span, .info h4, .info p, .kicker, blockquote{ white-space: pre-wrap; }
+
+
+/* =====================================================================
+   Sarmad design refresh v2 — pill buttons, soft filled inputs, lifted cards
+   ===================================================================== */
+.btn{ border-radius:999px; font-weight:700; letter-spacing:.2px; transition:transform .15s ease, box-shadow .25s ease, background .2s ease, color .2s ease; }
+.btn:active{ transform:scale(.96); }
+.btn-primary{ background:linear-gradient(135deg,#0E4FC0,var(--emerald) 55%,#3B8BFF); color:#fff; border:0; box-shadow:0 10px 22px -10px rgba(21,95,219,.55); }
+.btn-primary:hover{ transform:translateY(-1px); box-shadow:0 14px 28px -10px rgba(21,95,219,.65); }
+.btn-ghost{ background:#EAF1FD; color:var(--emerald); border:0; }
+.btn-ghost:hover{ background:#D7E5FC; }
+.field input, .field select, .field textarea, .filter-bar input[type=text]{
+  background:var(--surface-2); border:1.6px solid transparent; border-radius:16px; padding:13px 16px;
+  transition:border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.field input:focus, .field select:focus, .field textarea:focus, .filter-bar input[type=text]:focus{
+  outline:none; background:#F1F6FE; border-color:var(--emerald); box-shadow:0 0 0 4px var(--emerald-soft);
+}
+.card{ border-radius:22px; transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease; }
+.card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-lift); }
+.nav{ -webkit-backdrop-filter:blur(16px) saturate(180%); backdrop-filter:blur(16px) saturate(180%); }
+::selection{ background:var(--emerald-soft); }
+@media (prefers-reduced-motion:reduce){ *{ animation-duration:.01ms !important; transition-duration:.01ms !important; } }
