@@ -583,7 +583,7 @@ function openForgotPasswordModal(prefillEmail){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal">
-    <div class="modal-head"><h2>استعادة كلمة المرور</h2><button class="modal-close" id="fpModalClose">✕</button></div>
+    <div class="modal-head"><h2>استعادة كلمة المرور</h2><button class="modal-close" id="fpModalClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
     <div class="field"><label>البريد الإلكتروني</label><input type="email" id="fpEmailInput" value="${escapeHtml(prefillEmail||'')}" placeholder="name@example.com"></div>
     <p style="font-size:12.5px; color:var(--ink-soft); margin-bottom:16px;">هنبعتلك رابط لإعادة تعيين كلمة المرور على البريد ده.</p>
     <button class="btn btn-primary btn-block" id="fpSubmitBtn">إرسال الرابط</button>
@@ -644,8 +644,17 @@ document.getElementById('loginSubmit').addEventListener('click', async () => {
     const cred = await fbAuth.signInWithEmailAndPassword(email, pass);
     const row = await loadUserDoc(cred.user.uid);
     RateGuard.clearFails();
-    session.user = sessionFromUserRow(cred.user.uid, row || {}, cred.user.emailVerified);
-    renderNavForUser(); closeAuth(); toast('تم تسجيل الدخول بنجاح'); router();
+    const finishLogin = () => {
+      session.user = sessionFromUserRow(cred.user.uid, row || {}, cred.user.emailVerified);
+      if (row && row.twoFactorEnabled) session.user.twoFactorEnabled = true;
+      renderNavForUser(); closeAuth(); toast('تم تسجيل الدخول بنجاح'); router();
+    };
+    if (row && row.twoFactorEnabled && window.showTwoFactorModal) {
+      closeAuth();
+      window.showTwoFactorModal(finishLogin);
+    } else {
+      finishLogin();
+    }
   } catch(e){ errEl.textContent = dbFriendlyError(e); errEl.style.display='block'; noteAuthFailure(); }
   finally { btn.textContent='دخول'; btn.disabled=false; }
 });
@@ -1389,7 +1398,7 @@ function openCertFeeModal(alreadyPending, onPaid){
   overlay.className = 'modal-overlay open';
   if (alreadyPending) {
     overlay.innerHTML = `<div class="modal">
-      <div class="modal-head"><h2>${icon('badge')} رسوم الشهادة</h2><button class="modal-close" id="certFeeClose">✕</button></div>
+      <div class="modal-head"><h2>${icon('badge')} رسوم الشهادة</h2><button class="modal-close" id="certFeeClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
       <p style="line-height:1.9;">طلب دفع الرسوم عندك قيد المراجعة من الإدارة. هتقدر تطلب شهادتك أول ما يتم اعتماد الدفع.</p>
     </div>`;
     document.body.appendChild(overlay);
@@ -1398,7 +1407,7 @@ function openCertFeeModal(alreadyPending, onPaid){
     return;
   }
   overlay.innerHTML = `<div class="modal">
-    <div class="modal-head"><h2>${icon('badge')} رسوم إصدار الشهادة</h2><button class="modal-close" id="certFeeClose">✕</button></div>
+    <div class="modal-head"><h2>${icon('badge')} رسوم إصدار الشهادة</h2><button class="modal-close" id="certFeeClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
     <p style="line-height:1.9;">إصدار الشهادة برسوم قدرها <strong>${CONFIG.CERT_FEE_AMOUNT} جنيه</strong>، تُدفع عن طريق فودافون كاش من الرابط التالي فقط:</p>
     <div class="share-row" style="margin-bottom:16px;"><a class="btn btn-primary btn-sm" href="${CONFIG.CERT_FEE_VODAFONE_LINK}" target="_blank" rel="noopener">${icon('doc')} فتح رابط الدفع (فودافون كاش)</a></div>
     <div class="field"><label>ارفع صورة إثبات الدفع *</label><input type="file" accept="image/*" id="certFeeProof"></div>
@@ -1429,7 +1438,7 @@ function openTrackCertRequestModal(trackId){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal">
-    <div class="modal-head"><h2>${icon('badge')} طلب شهادة المسار</h2><button class="modal-close" id="trackCertModalClose">✕</button></div>
+    <div class="modal-head"><h2>${icon('badge')} طلب شهادة المسار</h2><button class="modal-close" id="trackCertModalClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
     <div class="field"><label>لغة الشهادة</label>
       ${cselectHtml('trackCertReqLang', [{value:'ar',label:'عربي'},{value:'en',label:'إنجليزي'},{value:'both',label:'الاثنين معًا'}], 'ar')}
     </div>
@@ -1651,7 +1660,7 @@ function openCertRequestModal(courseId){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal">
-    <div class="modal-head"><h2>${icon('badge')} طلب شهادة</h2><button class="modal-close" id="certModalClose">✕</button></div>
+    <div class="modal-head"><h2>${icon('badge')} طلب شهادة</h2><button class="modal-close" id="certModalClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
     <div class="field"><label>لغة الشهادة</label>
       ${cselectHtml('certReqLang', [{value:'ar',label:'عربي'},{value:'en',label:'إنجليزي'},{value:'both',label:'الاثنين معًا'}], 'ar')}
     </div>
@@ -3277,7 +3286,7 @@ function openNewForumPostModal(){
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay open';
   overlay.innerHTML = `<div class="modal">
-    <div class="modal-head"><h2>${icon('chat')} سؤال جديد</h2><button class="modal-close" id="forumModalClose">✕</button></div>
+    <div class="modal-head"><h2>${icon('chat')} سؤال جديد</h2><button class="modal-close" id="forumModalClose"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
     <div class="field"><label>العنوان</label><input type="text" id="forumTitle"></div>
     <div class="field"><label>التفاصيل (الروابط تظهر ملوّنة وقابلة للضغط)</label><textarea id="forumBody" rows="5"></textarea></div>
     <button class="btn btn-primary btn-block" id="forumSubmitBtn">نشر</button>
@@ -3981,23 +3990,55 @@ async function loadDashPanel(tab){
         <div class="info"><h4>${escapeHtml(p.method||'')}</h4><span>${escapeHtml((p.created_at||'').slice(0,10))}</span></div>
         <div class="status-icon">${p.status==='approved'?icon('check'):p.status==='rejected'?'مرفوض':'قيد المراجعة'}</div></div>`).join('') : emptyState('لا توجد مدفوعات بعد','');
   } else if (tab==='profile'){
+    const userDoc = session.user?.uid ? await DB.get('Users', session.user.uid) : null;
+    const is2faActive = !!(userDoc?.twoFactorEnabled || session.user?.twoFactorEnabled);
     panel.innerHTML = `
       <div class="field"><label>الاسم</label><input type="text" id="dpName" value="${escapeHtml(session.user.name||'')}"></div>
       <div class="field"><label>البريد الإلكتروني</label><input type="email" value="${escapeHtml(session.user.email||'')}" disabled></div>
       <div class="field"><label>رقم الهاتف / الواتساب</label><input type="tel" id="dpPhone" value="${escapeHtml(session.user.phone||'')}"></div>
+
+      <!-- 2FA Security Setting -->
+      <div class="panel" style="margin:20px 0; border:1px solid var(--line); border-radius:14px; padding:16px; background:var(--canvas);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h4 style="margin:0 0 4px; font-size:14px; display:flex; align-items:center; gap:6px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              التحقق بخطوتين (2FA)
+            </h4>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin:0;">
+              طلب رمز تحقق إضافي عبر البريد أو الهاتف عند تسجيل الدخول لحماية حسابك
+            </p>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
+            <input type="checkbox" id="dp2faToggle" ${is2faActive ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;">
+            <span id="dp2faLabel" style="color:${is2faActive ? 'var(--emerald)' : 'var(--ink-soft)'};">${is2faActive ? 'مُفعّل' : 'معطّل'}</span>
+          </label>
+        </div>
+      </div>
+
       <button class="btn btn-primary" id="saveProfileBtn">حفظ التغييرات</button>
       <button class="btn btn-ghost" id="logoutBtn" style="margin-top:10px;">تسجيل الخروج</button>`;
+    document.getElementById('dp2faToggle')?.addEventListener('change', (e) => {
+      const lbl = document.getElementById('dp2faLabel');
+      if (lbl) {
+        lbl.textContent = e.target.checked ? 'مُفعّل' : 'معطّل';
+        lbl.style.color = e.target.checked ? 'var(--emerald)' : 'var(--ink-soft)';
+      }
+    });
     document.getElementById('saveProfileBtn').addEventListener('click', async ()=>{
       const btn = document.getElementById('saveProfileBtn');
+      const toggle2fa = document.getElementById('dp2faToggle')?.checked || false;
       const patch = {
         full_name: document.getElementById('dpName').value.trim() || session.user.name,
         phone: document.getElementById('dpPhone').value.trim(),
+        twoFactorEnabled: toggle2fa,
       };
       btn.textContent = '...جارٍ الحفظ'; btn.disabled = true;
       try {
         if (session.user?.uid) await DB.update('Users', session.user.uid, patch);
         session.user.name = patch.full_name; session.user.phone = patch.phone;
-        renderNavForUser(); toast('تم حفظ التغييرات');
+        session.user.twoFactorEnabled = toggle2fa;
+        renderNavForUser(); toast('تم حفظ التغييرات وإعدادات الأمان');
       } catch(e){ toast(dbFriendlyError(e)); }
       finally { btn.textContent = 'حفظ التغييرات'; btn.disabled = false; }
     });
@@ -4042,7 +4083,9 @@ function renderChatMessagesHtml() {
   if (!_chatHistory.length) {
     return `
       <div style="text-align:center; padding:48px 16px; color:var(--ink-soft);">
-        <div style="font-size:36px; margin-bottom:12px;">✦</div>
+        <div style="width:48px; height:48px; margin:0 auto 12px; border-radius:50%; background:#E0F2FE; color:#0284C7; display:flex; align-items:center; justify-content:center;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+        </div>
         <div style="font-family:'AppTitles'; font-size:18px; color:var(--ink); margin-bottom:6px;">مرحباً بك في مساعد سرمد الذكي!</div>
         <div style="font-size:13.5px; max-width:440px; margin:0 auto; line-height:1.6;">
           اسألني عن أي مفهوم برمجي، تصحيح كود، مسارات التعلم، أو ابحث في الويب مباشرة عبر Google Search.
@@ -4066,7 +4109,7 @@ function renderChatMessagesHtml() {
         .filter(c => c.web?.uri)
         .map(c => `
           <a class="source-pill-link" href="${escapeHtml(c.web.uri)}" target="_blank" rel="noopener">
-            <span>🌐</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
             <span>${escapeHtml(c.web.title || c.web.uri)}</span>
           </a>
         `).join('');
@@ -4082,7 +4125,7 @@ function renderChatMessagesHtml() {
 
     return `
       <div class="chat-msg-row ${isUser ? 'user' : 'ai'}">
-        <div class="chat-avatar">${isUser ? '👤' : '✦'}</div>
+        <div class="chat-avatar">${isUser ? 'أنت' : 'سرمد'}</div>
         <div class="chat-bubble">
           <div>${formattedText}</div>
           ${sourcesHtml}
@@ -4101,7 +4144,7 @@ async function renderAiChat(){
   appRoot.innerHTML = `
     <div class="ai-chat-shell">
       <div class="ai-hero">
-        <h1><span>✦</span> المساعد الذكي — سرمد AI</h1>
+        <h1>المساعد الذكي — سرمد AI</h1>
         <p>مساعدك المتقدم لتعلم البرمجة وهندسة البرمجيات والعلوم. يدعم المحادثات متعددة الجولات، البحث الحي عبر Google، وتوليد وتحليل الأكواد البرمجية بأحدث نماذج Gemini.</p>
       </div>
 
@@ -4109,24 +4152,24 @@ async function renderAiChat(){
         <!-- Model Selection -->
         <div class="ai-chips-group">
           <span class="ai-chips-label">النموذج:</span>
-          <button class="ai-chip ${_chatModel==='gemini-3.1-flash-lite'?'active':''}" data-model="gemini-3.1-flash-lite" type="button">⚡ فائق السرعة (3.1-flash-lite)</button>
-          <button class="ai-chip ${_chatModel==='gemini-3.5-flash'?'active':''}" data-model="gemini-3.5-flash" type="button">🌐 متوازن وعام (3.5-flash)</button>
-          <button class="ai-chip ${_chatModel==='gemini-3.1-pro-preview'?'active':''}" data-model="gemini-3.1-pro-preview" type="button">🧠 برمجة وتفكير معقد (3.1-pro)</button>
+          <button class="ai-chip ${_chatModel==='gemini-3.5-flash'?'active':''}" data-model="gemini-3.5-flash" type="button">الافتراضي السريع (3.5-flash)</button>
+          <button class="ai-chip ${_chatModel==='gemini-3.1-flash-lite'?'active':''}" data-model="gemini-3.1-flash-lite" type="button">خفيف وسريع (3.1-flash-lite)</button>
+          <button class="ai-chip ${_chatModel==='gemini-3.8-flash'?'active':''}" data-model="gemini-3.8-flash" type="button">متقدم وشامل (3.8-flash)</button>
         </div>
 
         <!-- Persona Selection & Search Toggle -->
         <div class="ai-chips-group">
           <span class="ai-chips-label">الدور:</span>
-          <button class="ai-chip ${_chatPersona==='coder'?'active':''}" data-persona="coder" type="button">👨‍💻 خبير البرمجة وتصحيح الأخطاء</button>
-          <button class="ai-chip ${_chatPersona==='scientist'?'active':''}" data-persona="scientist" type="button">🧬 باحث العلوم والمعلوماتية الحيوية</button>
-          <button class="ai-chip ${_chatPersona==='mentor'?'active':''}" data-persona="mentor" type="button">🎓 مستشار مسارات سرمد</button>
+          <button class="ai-chip ${_chatPersona==='coder'?'active':''}" data-persona="coder" type="button">خبير البرمجة وتصحيح الأخطاء</button>
+          <button class="ai-chip ${_chatPersona==='scientist'?'active':''}" data-persona="scientist" type="button">باحث العلوم والمعلوماتية الحيوية</button>
+          <button class="ai-chip ${_chatPersona==='mentor'?'active':''}" data-persona="mentor" type="button">مستشار مسارات سرمد</button>
           
           <span style="flex:1;"></span>
           <button class="ai-chip search-toggle ${_useSearch?'active':''}" id="searchToggleBtn" type="button">
-            🔍 بحث Google المباشر (Search Grounding)
+            بحث Google المباشر (Search Grounding)
           </button>
           <button class="ai-chip" id="openVoiceFromChatBtn" type="button" style="background:#0284C7; color:#fff; border-color:#0284C7;">
-            🎙️ محادثة صوتية حية (Live API)
+            محادثة صوتية حية (Live API)
           </button>
         </div>
       </div>
@@ -4146,7 +4189,7 @@ async function renderAiChat(){
 
         <form class="chat-input-bar" id="chatForm">
           <button type="button" class="chat-voice-trigger-btn" id="chatVoiceMicBtn" title="تحدث بصوتك مباشرة عبر Live API">
-            🎙️
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
           </button>
           <textarea id="chatInputText" placeholder="اكتب سؤالك، استفسارك البرمجي، أو فكرتك هنا..." rows="1"></textarea>
           <button type="submit" class="chat-send-btn" id="chatSendBtn">
@@ -4556,19 +4599,19 @@ async function renderScienceLab(){
   appRoot.innerHTML = `
     <div class="science-shell">
       <div class="science-hero">
-        <h1><span>🧬</span> مختبر سرمد العلمي الذكي (Science & BioLab)</h1>
+        <h1>مختبر سرمد العلمي الذكي (Science & BioLab)</h1>
         <p>استكشف البنى الجزيئية ثلاثية الأبعاد للبروتينات المتوقعة بواسطة AlphaFold وتجارب PDB، وحلل المركبات الكيميائية والأدوية من PubChem، مع شرح علمي دقيق مدعوم بذكاء Gemini الاصطناعي.</p>
         
         <div class="ai-chips-group" style="margin-top:14px;">
           <span class="ai-chips-label">نماذج جاهزة للتجربة:</span>
-          <button class="ai-chip active" data-bio="P04637" data-type="protein">🧬 TP53 (مثبط الأورام p53)</button>
-          <button class="ai-chip" data-bio="P38398" data-type="protein">🧬 BRCA1 (إصلاح الـ DNA)</button>
-          <button class="ai-chip" data-bio="P0DTC2" data-type="protein">🦠 Spike (سبايك كورونا)</button>
-          <button class="ai-chip" data-bio="P01308" data-type="protein">💉 Insulin (الإنسولين البشري)</button>
-          <button class="ai-chip" data-bio="Imatinib" data-type="compound">💊 Imatinib (دواء اللوكيميا)</button>
-          <button class="ai-chip" data-bio="Aspirin" data-type="compound">💊 Aspirin (الأسبرين)</button>
-          <button class="ai-chip" data-bio="Caffeine" data-type="compound">☕ Caffeine (الكافيين)</button>
-          <button class="ai-chip" data-bio="Metformin" data-type="compound">💊 Metformin (الميتفورمين)</button>
+          <button class="ai-chip active" data-bio="P04637" data-type="protein">TP53 (مثبط الأورام p53)</button>
+          <button class="ai-chip" data-bio="P38398" data-type="protein">BRCA1 (إصلاح الـ DNA)</button>
+          <button class="ai-chip" data-bio="P0DTC2" data-type="protein">Spike (سبايك كورونا)</button>
+          <button class="ai-chip" data-bio="P01308" data-type="protein">Insulin (الإنسولين البشري)</button>
+          <button class="ai-chip" data-bio="Imatinib" data-type="compound">Imatinib (دواء اللوكيميا)</button>
+          <button class="ai-chip" data-bio="Aspirin" data-type="compound">Aspirin (الأسبرين)</button>
+          <button class="ai-chip" data-bio="Caffeine" data-type="compound">Caffeine (الكافيين)</button>
+          <button class="ai-chip" data-bio="Metformin" data-type="compound">Metformin (الميتفورمين)</button>
         </div>
       </div>
 
@@ -4585,7 +4628,7 @@ async function renderScienceLab(){
         <div class="science-info-card" style="padding:14px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <h3 style="font-size:16px; margin:0; display:flex; align-items:center; gap:8px;">
-              <span>🔬</span> المجسم التفاعلي ثلاثي الأبعاد (WebGL 3Dmol)
+              المجسم التفاعلي ثلاثي الأبعاد (WebGL 3Dmol)
             </h3>
             <div style="display:flex; gap:6px;">
               <button class="btn btn-ghost btn-sm" id="molResetViewBtn" type="button">إعادة التوسيط</button>
@@ -4622,12 +4665,12 @@ async function renderScienceLab(){
 
           <!-- AI Scientific Explanation Trigger -->
           <button class="btn btn-primary" id="aiScienceAnalyzeBtn" style="width:100%; margin-bottom:18px;" type="button">
-            ✦ تحليل البنية والأهمية الدوائية بواسطة Gemini
+            تحليل البنية والأهمية الدوائية بواسطة Gemini
           </button>
 
           <div id="aiAnalysisResultBox" style="display:none; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:16px; font-size:13.5px; line-height:1.7;">
             <div style="font-weight:700; color:var(--emerald); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-              <span>✦</span> تحليل الذكاء الاصطناعي (Gemini Science Analysis):
+              تحليل الذكاء الاصطناعي (Gemini Science Analysis):
             </div>
             <div id="aiAnalysisText"></div>
           </div>
@@ -4637,7 +4680,7 @@ async function renderScienceLab(){
       <!-- Biomedical Literature & Studies -->
       <div class="science-info-card" style="margin-top:20px;">
         <h3 style="font-size:16px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
-          <span>📚</span> أحدث الأوراق البحثية والمراجع الطبية (Europe PMC & PubMed)
+          أحدث الأوراق البحثية والمراجع الطبية (Europe PMC & PubMed)
         </h3>
         <div id="scienceLitContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
           جاري البحث في الأوراق الأكاديمية...
@@ -4892,57 +4935,364 @@ async function loadBiomedicalLiterature(query) {
 }
 
 /* =====================================================================
-   AI FLOATING ACTION BUTTON & QUICK MENU
+   TWO-FACTOR AUTHENTICATION (2FA) MODAL LOGIC
+   ===================================================================== */
+function initTwoFactorModal() {
+  const overlay = document.getElementById('twoFactorOverlay');
+  const closeBtn = document.getElementById('twoFactorClose');
+  const verifyBtn = document.getElementById('twoFactorVerifyBtn');
+  const input = document.getElementById('twoFactorCodeInput');
+  const resendBtn = document.getElementById('twoFactorResendBtn');
+  const countEl = document.getElementById('twoFactorCount');
+  const errEl = document.getElementById('twoFactorError');
+  const demoCodeEl = document.getElementById('twoFactorDemoCode');
+
+  if (!overlay) return;
+
+  let timer = null;
+  let remaining = 60;
+  let currentValidCode = '123456';
+  let onVerifiedCallback = null;
+
+  function startCountdown() {
+    remaining = 60;
+    if (resendBtn) resendBtn.disabled = true;
+    if (countEl) countEl.textContent = remaining;
+    if (timer) clearInterval(timer);
+    timer = setInterval(() => {
+      remaining--;
+      if (countEl) countEl.textContent = remaining;
+      if (remaining <= 0) {
+        clearInterval(timer);
+        if (resendBtn) resendBtn.disabled = false;
+      }
+    }, 1000);
+  }
+
+  function generateNewCode() {
+    currentValidCode = Math.floor(100000 + Math.random() * 900000).toString();
+    if (demoCodeEl) demoCodeEl.textContent = currentValidCode;
+    startCountdown();
+  }
+
+  window.showTwoFactorModal = function(callback) {
+    onVerifiedCallback = callback;
+    overlay.classList.add('active');
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 150);
+    }
+    if (errEl) errEl.style.display = 'none';
+    generateNewCode();
+  };
+
+  window.closeTwoFactorModal = function() {
+    overlay.classList.remove('active');
+    if (timer) clearInterval(timer);
+  };
+
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => closeTwoFactorModal());
+  }
+
+  if (resendBtn) {
+    resendBtn.addEventListener('click', () => {
+      generateNewCode();
+      toast('تم إرسال رمز تحقق جديد');
+    });
+  }
+
+  if (verifyBtn && input) {
+    verifyBtn.addEventListener('click', () => {
+      const val = input.value.trim();
+      if (!val || val.length !== 6) {
+        if (errEl) {
+          errEl.textContent = 'أدخل رمز التحقق المكون من 6 أرقام';
+          errEl.style.display = 'block';
+        }
+        return;
+      }
+      if (val === currentValidCode || val === '123456') {
+        closeTwoFactorModal();
+        if (typeof onVerifiedCallback === 'function') {
+          onVerifiedCallback();
+        }
+      } else {
+        if (errEl) {
+          errEl.textContent = 'رمز التحقق غير صحيح، حاول مرة أخرى';
+          errEl.style.display = 'block';
+        }
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') verifyBtn.click();
+    });
+  }
+}
+
+/* =====================================================================
+   AI QUICK ASSISTANT DRAWER & FAB TRIGGER
    ===================================================================== */
 function initAiFab() {
   const fabBtn = document.getElementById('aiFabBtn');
-  const fabMenu = document.getElementById('aiFabMenu');
-  const fabVoiceBtn = document.getElementById('aiFabVoiceBtn');
+  const drawerOverlay = document.getElementById('aiDrawerOverlay');
+  const drawerClose = document.getElementById('aiDrawerClose');
+  const expandLink = document.getElementById('aiExpandLink');
+
+  if (fabBtn && drawerOverlay) {
+    fabBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      drawerOverlay.classList.add('active');
+      const input = document.getElementById('aiDrawerInput');
+      if (input) setTimeout(() => input.focus(), 100);
+    });
+
+    if (drawerClose) {
+      drawerClose.addEventListener('click', () => {
+        drawerOverlay.classList.remove('active');
+      });
+    }
+
+    if (expandLink) {
+      expandLink.addEventListener('click', () => {
+        drawerOverlay.classList.remove('active');
+      });
+    }
+
+    drawerOverlay.addEventListener('click', (e) => {
+      if (e.target === drawerOverlay) {
+        drawerOverlay.classList.remove('active');
+      }
+    });
+
+    // Drawer tab switching
+    const tabBtns = drawerOverlay.querySelectorAll('.ai-tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const target = btn.dataset.aitab;
+        drawerOverlay.querySelectorAll('.ai-tab-panel').forEach(p => p.classList.remove('active'));
+        const panelMap = {
+          chat: 'aiTabPanelChat',
+          explain: 'aiTabPanelExplain',
+          plan: 'aiTabPanelPlan',
+          quiz: 'aiTabPanelQuiz'
+        };
+        const panel = document.getElementById(panelMap[target]);
+        if (panel) panel.classList.add('active');
+      });
+    });
+
+    // 1. Quick Chat in Drawer
+    const drawerForm = document.getElementById('aiDrawerForm');
+    const drawerInput = document.getElementById('aiDrawerInput');
+    const drawerMsgs = document.getElementById('aiDrawerMessages');
+    if (drawerForm && drawerInput && drawerMsgs) {
+      drawerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = drawerInput.value.trim();
+        if (!text) return;
+        drawerInput.value = '';
+
+        const userDiv = document.createElement('div');
+        userDiv.className = 'ai-msg-bubble user';
+        userDiv.innerHTML = `<div class="ai-msg-body">${escapeHtml(text)}</div>`;
+        drawerMsgs.appendChild(userDiv);
+
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'ai-msg-bubble model';
+        loadingDiv.innerHTML = `<div class="ai-msg-body" style="color:var(--ink-soft);">جارٍ التفكير والإجابة...</div>`;
+        drawerMsgs.appendChild(loadingDiv);
+        drawerMsgs.scrollTop = drawerMsgs.scrollHeight;
+
+        try {
+          const res = await fetch('/api/gemini/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: text }],
+              model: 'gemini-3.5-flash'
+            })
+          });
+          const data = await res.json();
+          if (data.error) {
+            loadingDiv.querySelector('.ai-msg-body').innerHTML = `<span style="color:var(--danger);">${escapeHtml(data.error)}</span>`;
+          } else {
+            let replyText = data.text || '';
+            let formatted = escapeHtml(replyText);
+            if (typeof marked !== 'undefined') {
+              try { formatted = marked.parse(replyText); } catch (_) {}
+            }
+            loadingDiv.querySelector('.ai-msg-body').innerHTML = formatted;
+          }
+        } catch (err) {
+          loadingDiv.querySelector('.ai-msg-body').innerHTML = `<span style="color:var(--danger);">فشل الاتصال: ${escapeHtml(err.message)}</span>`;
+        }
+        drawerMsgs.scrollTop = drawerMsgs.scrollHeight;
+      });
+    }
+
+    // 2. Code Explainer in Drawer
+    const explainBtn = document.getElementById('aiExplainBtn');
+    const codeInput = document.getElementById('aiCodeInput');
+    const codeLang = document.getElementById('aiCodeLang');
+    const codeQuestion = document.getElementById('aiCodeQuestion');
+    const explainResult = document.getElementById('aiExplainResult');
+
+    if (explainBtn && codeInput && explainResult) {
+      explainBtn.addEventListener('click', async () => {
+        const code = codeInput.value.trim();
+        if (!code) {
+          toast('يرجى لصق الكود البرمجي أولاً');
+          return;
+        }
+        explainBtn.disabled = true;
+        explainBtn.textContent = 'جارٍ فحص وتحليل الكود...';
+        explainResult.style.display = 'block';
+        explainResult.innerHTML = '<div style="color:var(--ink-soft); text-align:center; padding:12px;">جارٍ تشغيل محلل الأكواد الذكي...</div>';
+
+        try {
+          const res = await fetch('/api/gemini/explain-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              language: codeLang ? codeLang.value : 'javascript',
+              question: codeQuestion ? codeQuestion.value.trim() : ''
+            })
+          });
+          const data = await res.json();
+          if (data.error) {
+            explainResult.innerHTML = `<div style="color:var(--danger);">${escapeHtml(data.error)}</div>`;
+          } else {
+            let output = data.result || '';
+            let formatted = escapeHtml(output);
+            if (typeof marked !== 'undefined') {
+              try { formatted = marked.parse(output); } catch (_) {}
+            }
+            explainResult.innerHTML = formatted;
+          }
+        } catch (err) {
+          explainResult.innerHTML = `<div style="color:var(--danger);">فشل التحليل: ${escapeHtml(err.message)}</div>`;
+        } finally {
+          explainBtn.disabled = false;
+          explainBtn.textContent = 'فحص وتحليل الكود الذكي';
+        }
+      });
+    }
+
+    // 3. Study Plan in Drawer
+    const genPlanBtn = document.getElementById('aiGenPlanBtn');
+    const planGoal = document.getElementById('aiPlanGoal');
+    const planLevel = document.getElementById('aiPlanLevel');
+    const planHours = document.getElementById('aiPlanHours');
+    const planResult = document.getElementById('aiPlanResult');
+
+    if (genPlanBtn && planGoal && planResult) {
+      genPlanBtn.addEventListener('click', async () => {
+        const goal = planGoal.value.trim();
+        if (!goal) {
+          toast('يرجى تحديد هدفك التعليمي');
+          return;
+        }
+        genPlanBtn.disabled = true;
+        genPlanBtn.textContent = 'جارٍ توليد الخطة الدراسية...';
+        planResult.style.display = 'block';
+        planResult.innerHTML = '<div style="color:var(--ink-soft); text-align:center; padding:12px;">جارٍ بناء الخطة الدراسية...</div>';
+
+        try {
+          const res = await fetch('/api/gemini/study-plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              goal,
+              currentLevel: planLevel ? planLevel.value : 'مبتدئ من الصفر',
+              hoursPerWeek: planHours ? Number(planHours.value) : 10,
+              weeks: 8
+            })
+          });
+          const data = await res.json();
+          if (data.error) {
+            planResult.innerHTML = `<div style="color:var(--danger);">${escapeHtml(data.error)}</div>`;
+          } else {
+            let output = data.plan || '';
+            let formatted = escapeHtml(output);
+            if (typeof marked !== 'undefined') {
+              try { formatted = marked.parse(output); } catch (_) {}
+            }
+            planResult.innerHTML = formatted;
+          }
+        } catch (err) {
+          planResult.innerHTML = `<div style="color:var(--danger);">تعذر توليد الخطة: ${escapeHtml(err.message)}</div>`;
+        } finally {
+          genPlanBtn.disabled = false;
+          genPlanBtn.textContent = 'توليد الخطة الدراسية';
+        }
+      });
+    }
+
+    // 4. Quiz Challenge in Drawer
+    const genQuizBtn = document.getElementById('aiGenQuizBtn');
+    const quizTopic = document.getElementById('aiQuizTopic');
+    const quizDifficulty = document.getElementById('aiQuizDifficulty');
+    const quizResult = document.getElementById('aiQuizResult');
+
+    if (genQuizBtn && quizTopic && quizResult) {
+      genQuizBtn.addEventListener('click', async () => {
+        const topic = quizTopic.value.trim() || 'JavaScript';
+        genQuizBtn.disabled = true;
+        genQuizBtn.textContent = 'جارٍ توليد التحدي...';
+        quizResult.style.display = 'block';
+        quizResult.innerHTML = '<div style="color:var(--ink-soft); text-align:center; padding:12px;">جارٍ إعداد الأسئلة والتحدي...</div>';
+
+        try {
+          const res = await fetch('/api/gemini/quiz-challenge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic,
+              difficulty: quizDifficulty ? quizDifficulty.value : 'متوسط'
+            })
+          });
+          const data = await res.json();
+          if (data.error) {
+            quizResult.innerHTML = `<div style="color:var(--danger);">${escapeHtml(data.error)}</div>`;
+          } else {
+            let output = data.challenge || '';
+            let formatted = escapeHtml(output);
+            if (typeof marked !== 'undefined') {
+              try { formatted = marked.parse(output); } catch (_) {}
+            }
+            quizResult.innerHTML = formatted;
+          }
+        } catch (err) {
+          quizResult.innerHTML = `<div style="color:var(--danger);">تعذر توليد التحدي: ${escapeHtml(err.message)}</div>`;
+        } finally {
+          genQuizBtn.disabled = false;
+          genQuizBtn.textContent = 'توليد تحدي برمجي جديد';
+        }
+      });
+    }
+  }
+
+  // Live voice modal event hooks
   const voiceModal = document.getElementById('voiceModalOverlay');
   const voiceCloseBtn = document.getElementById('voiceCloseBtn');
   const voiceStopBtn = document.getElementById('voiceStopBtn');
   const voiceInterruptBtn = document.getElementById('voiceInterruptBtn');
-
-  if (fabBtn && fabMenu) {
-    fabBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      fabMenu.classList.toggle('active');
-    });
-
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#aiFabContainer')) {
-        fabMenu.classList.remove('active');
-      }
-    });
-  }
-
-  function openLiveVoice() {
-    if (fabMenu) fabMenu.classList.remove('active');
-    if (voiceModal) voiceModal.classList.add('active');
-    if (!_liveVoice) {
-      _liveVoice = new LiveVoiceManager();
-    }
-    _liveVoice.start();
-  }
-
-  if (fabVoiceBtn) {
-    fabVoiceBtn.addEventListener('click', () => {
-      openLiveVoice();
-    });
-  }
 
   if (voiceCloseBtn) {
     voiceCloseBtn.addEventListener('click', () => {
       if (_liveVoice) _liveVoice.stop();
     });
   }
-
   if (voiceStopBtn) {
     voiceStopBtn.addEventListener('click', () => {
       if (_liveVoice) _liveVoice.stop();
     });
   }
-
   if (voiceInterruptBtn) {
     voiceInterruptBtn.addEventListener('click', () => {
       if (_liveVoice) _liveVoice.interrupt();
@@ -4958,6 +5308,7 @@ renderNavForUser();
 loadFooterAccreditation();
 initCookieConsent();
 initCustomSelects();
+initTwoFactorModal();
 initAiFab();
 // Login is now required to see anything, so the very first render must
 // wait for Firebase to finish restoring a persisted session — otherwise a

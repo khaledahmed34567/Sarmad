@@ -15,12 +15,30 @@ const HOST = '0.0.0.0';
 
 app.use(express.json({ limit: '10mb' }));
 
-// Initialize GoogleGenAI SDK
-const apiKey = process.env.GEMINI_API_KEY || '';
-let ai = null;
-if (apiKey) {
-  ai = new GoogleGenAI({
-    apiKey,
+import fs from 'fs';
+
+// Helper to reliably retrieve valid Gemini API key
+function getGeminiApiKey() {
+  const envKey = (process.env.GEMINI_API_KEY || '').trim();
+  if (envKey && !envKey.startsWith('MY_') && envKey.length > 10) {
+    return envKey;
+  }
+  try {
+    if (fs.existsSync('/app/.dev.env.json')) {
+      const parsed = JSON.parse(fs.readFileSync('/app/.dev.env.json', 'utf8'));
+      if (parsed.GEMINI_API_KEY && !parsed.GEMINI_API_KEY.startsWith('MY_')) {
+        return parsed.GEMINI_API_KEY.trim();
+      }
+    }
+  } catch (e) {}
+  return envKey;
+}
+
+function getGeminiClient() {
+  const key = getGeminiApiKey();
+  if (!key) return null;
+  return new GoogleGenAI({
+    apiKey: key,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -48,53 +66,50 @@ app.get(['/admin', '/admin.html'], (req, res) => {
 
 // API: Health & Gemini models status
 app.get('/api/health', (req, res) => {
+  const key = getGeminiApiKey();
   res.json({
     status: 'ok',
-    hasApiKey: !!process.env.GEMINI_API_KEY,
+    hasApiKey: !!key,
+    keyValid: key.length > 20,
     modelsAvailable: [
       'gemini-3.5-flash',
       'gemini-3.1-flash-lite',
-      'gemini-3.1-pro-preview',
       'gemini-3.8-flash',
+      'gemini-3.1-pro-preview',
       'gemini-3.8-live'
     ]
   });
 });
 
 // Helper for model fallback
-async function callGeminiWithFallback(model, contents, config) {
-  if (!ai) {
-    throw new Error('مفتاح Gemini API غير مهيأ في الخادم (process.env.GEMINI_API_KEY).');
+async function callGeminiWithFallback(preferredModel, contents, config) {
+  const client = getGeminiClient();
+  if (!client) {
+    throw new Error('مفتاح Gemini API غير مهيأ في النظام.');
   }
 
   // Model prioritization and fallback
   const modelCandidates = [
-    model,
+    preferredModel,
     'gemini-3.5-flash',
     'gemini-3.1-flash-lite',
-    'gemini-3.8-flash',
-    'gemini-3.1-pro-preview'
+    'gemini-3.8-flash'
   ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
   let lastError = null;
   for (const m of modelCandidates) {
     try {
       const cfg = { ...config };
-      const res = await ai.models.generateContent({
+      const res = await client.models.generateContent({
         model: m,
         contents,
         config: cfg
       });
       return { response: res, modelUsed: m };
     } catch (err) {
-      console.warn(`Model ${m} call failed:`, err.status || err.message);
+      console.warn(`Model ${m} call failed:`, err.message || err);
       lastError = err;
-      // If 429 quota or 503 high demand, try next model in candidate list
-      if (err.status === 429 || err.status === 503 || (err.message && (err.message.includes('quota') || err.message.includes('demand')))) {
-        continue;
-      } else {
-        throw err;
-      }
+      continue;
     }
   }
   throw lastError;
@@ -107,7 +122,7 @@ app.post('/api/gemini/chat', async (req, res) => {
       messages = [],
       model = 'gemini-3.5-flash',
       useSearch = false,
-      systemInstruction = 'أنت مساعد سرمد الذكي، خبير في تعليم البرمجة والعلوم والتقنية باللغة العربية.'
+      systemInstruction = 'أنت مساعد سرمد الذكي، خبير في تعليم البرمجة والعلوم والتقنية باللغة العربية. قدم إجابات واضحة، تعليمية، ومنسقة دون استخدام أي إيموجيز نهائياً.'
     } = req.body;
 
     if (!messages.length) {
@@ -121,7 +136,7 @@ app.post('/api/gemini/chat', async (req, res) => {
     }));
 
     const config = {
-      systemInstruction
+      systemInstruction: systemInstruction + ' تنبيه: يمنع استخدام أي رموز تعبيرية (Emojis) في ردودك، اعتمد على التنسيق الاحترافي والرموز النصية أو العناوين فقط.'
     };
 
     if (useSearch) {
@@ -140,16 +155,120 @@ app.post('/api/gemini/chat', async (req, res) => {
     });
   } catch (error) {
     console.error('Chat API Error:', error);
-    let userMsg = error.message || 'حدث خطأ أثناء معالجة الطلب في الذكاء الاصطناعي.';
-    if (userMsg.includes('API_KEY_INVALID') || userMsg.includes('API key not valid')) {
-      userMsg = 'مفتاح Gemini API الحالي بحاجة للتفعيل أو المراجعة. يمكنك تحديثه من لوحة Settings > Secrets في AI Studio.';
-    } else if (userMsg.includes('RESOURCE_EXHAUSTED') || error.status === 429) {
-      userMsg = 'تم استنفاد الحصة المؤقتة للنموذج. يمكنك التبديل لنموذج آخر أو ترقية الحصة عبر Settings > Secrets.';
-    }
     res.status(500).json({
-      error: userMsg,
+      error: error.message || 'حدث خطأ أثناء معالجة الطلب في الذكاء الاصطناعي.',
       status: error.status || 500
     });
+  }
+});
+
+// NEW FEATURE: Smart Code Explainer, Debugger & Optimizer
+app.post('/api/gemini/explain-code', async (req, res) => {
+  try {
+    const { code, language = 'javascript', question = '' } = req.body;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: 'الكود البرمجي مطلوب.' });
+    }
+
+    const prompt = `أنت مهندس برمجيات أول ومصحح أكواد خبير في منصة سرمد التعليمية.
+قم بتحليل الكود التالي المكتوب بلغة (${language}):
+
+\`\`\`${language}
+${code}
+\`\`\`
+
+${question ? `سؤال المستخدم المحدد: ${question}` : ''}
+
+قدم تقريراً شاملاً باللغة العربية الفصحى منظم كالتالي:
+1. **شرح الكود ووظيفته:** كيف يعمل خطوة بخطوة.
+2. **الأخطاء والمشاكل المكتشفة:** أخطاء منطقية، مشاكل أداء، أو ثغرات أمنية (إن وجدت).
+3. **الكود المصحح والمحسّن:** كود نظيف، متبع لأفضل الممارسات (Clean Code).
+4. **تحليل التعقيد الحسابي:** Time Complexity (O(n)) و Space Complexity مع التعليل.
+
+ملاحظة صارمة: لا تستخدم أي رموز تعبيرية (Emojis) إطلاقاً في الشرح أو الرد.`;
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
+      systemInstruction: 'أنت مهندس برمجيات خبير يشرح الأكواد بأسلوب احترافي خالٍ تماماً من الإيموجيز.'
+    });
+
+    res.json({
+      result: response.text || '',
+      modelUsed
+    });
+  } catch (err) {
+    console.error('Explain code error:', err);
+    res.status(500).json({ error: err.message || 'فشل تحليل الكود البرمجي.' });
+  }
+});
+
+// NEW FEATURE: Custom AI Study Plan Generator
+app.post('/api/gemini/study-plan', async (req, res) => {
+  try {
+    const { goal, currentLevel = 'beginner', hoursPerWeek = 10, weeks = 8 } = req.body;
+    if (!goal || !goal.trim()) {
+      return res.status(400).json({ error: 'الهدف التعليمي مطلوب.' });
+    }
+
+    const prompt = `أنت مستشار أكاديمي ومهني في منصة سرمد لتعليم البرمجة والتقنية.
+قم بإنشاء خطة دراسية مخصصة واحترافية للمتعلم:
+- الهدف: ${goal}
+- المستوى الحالي: ${currentLevel}
+- ساعات المذاكرة أسبوعياً: ${hoursPerWeek} ساعات
+- مدة الخطة: ${weeks} أسابيع
+
+نسق الخطة بدقة باللغة العربية كالتالي:
+1. **نظرة عامة على المسار والمهارات المستهدفة**
+2. **جدول زمني مقسم أسبوع بأسبوع:**
+   - موضوع الأسبوع
+   - مفاهيم أساسية يجب إتقانها
+   - مشاريع وتطبيقات عملية (Hands-on Projects)
+   - مقاييس الإنجاز (Checkpoints)
+3. **أفضل الممارسات والنصائح الذهبية لتسريع التعلم**
+
+ملاحظة صارمة: ممنوع استخدام أي إيموجيز (رموز تعبيرية) نهائياً.`;
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
+      systemInstruction: 'أنت مستشار تعليمي متخصص في صناعة الخطط الدراسية البرمجية دون استخدام أي رموز تعبيرية.'
+    });
+
+    res.json({
+      plan: response.text || '',
+      modelUsed
+    });
+  } catch (err) {
+    console.error('Study plan error:', err);
+    res.status(500).json({ error: err.message || 'فشل توليد الخطة الدراسية.' });
+  }
+});
+
+// NEW FEATURE: AI Coding Challenge & Quiz Generator
+app.post('/api/gemini/quiz-challenge', async (req, res) => {
+  try {
+    const { topic = 'JavaScript', difficulty = 'intermediate' } = req.body;
+
+    const prompt = `أنشئ تحدياً برمجياً واختباراً ذكياً للموضوع (${topic}) بمستوى صعوبة (${difficulty}).
+قدم:
+1. **نص التحدي البرمجي:** المشكلة المطلوب حلها بوضوح مع الشروط والمدخلات والمخرجات المتوقعة (Test Cases).
+2. **سؤالين اختيار من متعدد (MCQ):** مع 4 خيارات لكل سؤال وتحديد الإجابة الصحيحة مع التعليل.
+3. **تلميح برمجي (Hint):** لمساعدة المتعلم دون حرق الحل.
+4. **الحل النموذجي الموصى به:** مع شرح كفاءة الحل.
+
+ملاحظة هامة: لا تستخدم أي إيموجيز إطلاقاً في أي جزء من الإجابة.`;
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
+      systemInstruction: 'أنت مسؤول إعداد الاختبارات والتحديات البرمجية في منصة سرمد، تقدم أسئلة رصينة بدون أي إيموجيز.'
+    });
+
+    res.json({
+      challenge: response.text || '',
+      modelUsed
+    });
+  } catch (err) {
+    console.error('Quiz challenge error:', err);
+    res.status(500).json({ error: err.message || 'فشل توليد التحدي البرمجي.' });
   }
 });
 
@@ -306,7 +425,8 @@ wss.on('connection', async (clientWs) => {
   let liveSession = null;
 
   try {
-    if (!ai) {
+    const liveClient = getGeminiClient();
+    if (!liveClient) {
       clientWs.send(JSON.stringify({
         type: 'error',
         error: 'Gemini API Key is not configured on the server.'
@@ -315,7 +435,7 @@ wss.on('connection', async (clientWs) => {
       return;
     }
 
-    liveSession = await ai.live.connect({
+    liveSession = await liveClient.live.connect({
       model: 'gemini-3.8-live',
       config: {
         responseModalities: [Modality.AUDIO],

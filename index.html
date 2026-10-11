@@ -54,8 +54,8 @@
     </div>
     <a href="#/" data-close-menu>الرئيسية</a>
     <a href="#/tracks" data-close-menu>المسارات</a>
-    <a href="#/ai-chat" data-close-menu style="color:var(--emerald); font-weight:700;">المساعد الذكي ✦</a>
-    <a href="#/science-lab" data-close-menu style="color:#0D9488; font-weight:700;">المختبر العلمي 🧬</a>
+    <a href="#/ai-chat" data-close-menu style="color:var(--emerald); font-weight:700;">المساعد الذكي</a>
+    <a href="#/science-lab" data-close-menu style="color:#0D9488; font-weight:700;">المختبر العلمي</a>
     <a href="#/leaderboard" data-close-menu>المتصدرون</a>
     <a href="#/articles" data-close-menu>المقالات</a>
     <a href="#/forum" data-close-menu>المجتمع</a>
@@ -90,7 +90,9 @@
   <div class="modal">
     <div class="modal-head">
       <h2 id="authTitle">تسجيل الدخول</h2>
-      <button class="modal-close" id="authClose">✕</button>
+      <button class="modal-close" id="authClose" aria-label="إغلاق">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div class="tabs">
       <button class="active" data-tab="login">تسجيل الدخول</button>
@@ -231,41 +233,198 @@
 })();
 </script>
 
-<!-- ============ FLOATING AI QUICK TRIGGER ============ -->
+<!-- ============ TWO-FACTOR AUTHENTICATION (2FA) MODAL ============ -->
+<div class="modal-overlay" id="twoFactorOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h2 style="display:flex; align-items:center; gap:8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        التحقق بخطوتين (2FA)
+      </h2>
+      <button class="modal-close" id="twoFactorClose" type="button" aria-label="إغلاق">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div style="padding:16px 0;">
+      <p style="font-size:13.5px; color:var(--ink-soft); margin-bottom:16px; line-height:1.6;" id="twoFactorDesc">
+        لتعزيز أمان حسابك في سرمد، أدخل رمز التحقق المكون من 6 أرقام.
+      </p>
+      <div style="display:flex; justify-content:center; gap:8px; direction:ltr; margin-bottom:14px;">
+        <input type="text" maxlength="6" id="twoFactorCodeInput" placeholder="000000" autocomplete="one-time-code" style="text-align:center; font-size:26px; letter-spacing:6px; font-weight:700; font-family:monospace; width:220px; padding:10px; border-radius:12px; border:2px solid var(--emerald); outline:none; background:var(--canvas); color:var(--ink);">
+      </div>
+      <div id="twoFactorDemoNotice" style="font-size:12px; color:var(--emerald); background:rgba(0,180,136,0.08); padding:8px 12px; border-radius:8px; margin-bottom:14px; text-align:center;">
+        رمز التحقق هو: <strong id="twoFactorDemoCode">123456</strong>
+      </div>
+      <div id="twoFactorError" style="color:var(--danger); font-size:13px; display:none; margin-bottom:12px; text-align:center;"></div>
+      <button class="btn btn-primary btn-block" id="twoFactorVerifyBtn" type="button" style="margin-bottom:10px;">
+        تأكيد الدخول
+      </button>
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--ink-soft); margin-top:8px;">
+        <span id="twoFactorTimer">إعادة الإرسال بعد: <strong id="twoFactorCount">60</strong> ثانية</span>
+        <button type="button" id="twoFactorResendBtn" style="background:none; border:none; color:var(--emerald); cursor:pointer; font-weight:600; text-decoration:underline;">إعادة إرسال الرمز</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FLOATING AI TRIGGER BUTTON ============ -->
 <div class="ai-fab-container" id="aiFabContainer">
-  <button class="ai-fab-btn" id="aiFabBtn" aria-label="ذكاء سرمد" title="المساعد الذكي سرمد ✦">
-    <span class="ai-fab-sparkle">✦</span>
+  <button class="ai-fab-btn" id="aiFabBtn" aria-label="مساعد سرمد الذكي" title="مساعد سرمد الذكي">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
     <span>ذكاء سرمد</span>
   </button>
-  <div class="ai-fab-menu" id="aiFabMenu">
-    <a href="#/ai-chat" class="ai-fab-item">
-      <span class="ai-fab-item-icon">💬</span>
-      <div class="ai-fab-item-info">
-        <strong>المساعد الذكي (Gemini Chat)</strong>
-        <small>محادثات ذكية متعددة الجولات وشرح الأكواد</small>
+</div>
+
+<!-- ============ AI QUICK ASSISTANT DRAWER ============ -->
+<div class="ai-drawer-overlay" id="aiDrawerOverlay">
+  <div class="ai-drawer">
+    <div class="ai-drawer-head">
+      <div class="ai-drawer-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+        <span>مساعد سرمد الذكي</span>
+        <span class="ai-badge-live">Gemini 3.5</span>
       </div>
-    </a>
-    <button class="ai-fab-item" id="aiFabVoiceBtn" type="button">
-      <span class="ai-fab-item-icon">🎙️</span>
-      <div class="ai-fab-item-info">
-        <strong>محادثة صوتية حية (Live API)</strong>
-        <small>تحدث مباشرة في الوقت الفعلي مع gemini-3.8-live</small>
+      <div class="ai-drawer-actions">
+        <a href="#/ai-chat" class="ai-expand-link" title="فتح كصفحة كاملة" id="aiExpandLink">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+        </a>
+        <button class="ai-drawer-close" id="aiDrawerClose" aria-label="إغلاق">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
       </div>
-    </button>
-    <a href="#/science-lab" class="ai-fab-item">
-      <span class="ai-fab-item-icon">🧬</span>
-      <div class="ai-fab-item-info">
-        <strong>المختبر العلمي الذكي (Science Lab)</strong>
-        <small>مجسمات بروتينات ثلاثية الأبعاد ومركبات دوائية</small>
+    </div>
+
+    <!-- Navigation Tabs inside Drawer -->
+    <div class="ai-drawer-tabs">
+      <button class="ai-tab-btn active" data-aitab="chat">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        محادثة ذكية
+      </button>
+      <button class="ai-tab-btn" data-aitab="explain">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        محلل الأكواد
+      </button>
+      <button class="ai-tab-btn" data-aitab="plan">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        خطة دراسية
+      </button>
+      <button class="ai-tab-btn" data-aitab="quiz">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        تحديات برمجية
+      </button>
+    </div>
+
+    <div class="ai-drawer-body">
+      <!-- TAB 1: QUICK CHAT -->
+      <div class="ai-tab-panel active" id="aiTabPanelChat">
+        <div class="ai-drawer-messages" id="aiDrawerMessages">
+          <div class="ai-msg-bubble model">
+            <div class="ai-msg-body">
+              مرحباً بك في منصة سرمد. أنا مساعدك الذكي المعتمد على أحدث نماذج Gemini. كيف يمكنني مساعدتك في دراستك البرمجية والتقنية اليوم؟
+            </div>
+          </div>
+        </div>
+        <form class="ai-drawer-input-form" id="aiDrawerForm">
+          <input type="text" id="aiDrawerInput" placeholder="اسأل عن أي مفهوم برمجي أو مشكلة تقنية..." autocomplete="off">
+          <button type="submit" id="aiDrawerSendBtn" aria-label="إرسال">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </form>
       </div>
-    </a>
+
+      <!-- TAB 2: CODE EXPLAINER & DEBUGGER -->
+      <div class="ai-tab-panel" id="aiTabPanelExplain">
+        <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:10px;">
+          الصق كودك البرمجي للحصول على تحليل خطوة بخطوة، اكتشاف الأخطاء، وكود محسّن.
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+          <select id="aiCodeLang" style="padding:6px 12px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="python">Python</option>
+            <option value="html">HTML / CSS</option>
+            <option value="sql">SQL</option>
+            <option value="cpp">C++</option>
+            <option value="java">Java</option>
+            <option value="php">PHP</option>
+          </select>
+          <input type="text" id="aiCodeQuestion" placeholder="سؤالك المحدد (اختياري، مثلاً: أين الخطأ؟)" style="flex:1; padding:6px 12px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+        </div>
+        <textarea id="aiCodeInput" placeholder="// الصق كودك هنا..." rows="6" style="width:100%; box-sizing:border-box; font-family:monospace; direction:ltr; text-align:left; font-size:13px; padding:10px; border-radius:10px; border:1px solid var(--line); background:#0F172A; color:#E2E8F0; resize:vertical; margin-bottom:10px;"></textarea>
+        <button type="button" class="btn btn-primary btn-block" id="aiExplainBtn">
+          فحص وتحليل الكود الذكي
+        </button>
+        <div id="aiExplainResult" style="margin-top:12px; font-size:13px; line-height:1.6; max-height:280px; overflow-y:auto; display:none; background:var(--canvas); padding:12px; border-radius:10px; border:1px solid var(--line);"></div>
+      </div>
+
+      <!-- TAB 3: STUDY PLAN GENERATOR -->
+      <div class="ai-tab-panel" id="aiTabPanelPlan">
+        <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:12px;">
+          حدد هدفك ومستواك وساعاتك لإنشاء مسار دراسي مخصص ومقسم أسبوعياً.
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">الهدف التعليمي:</label>
+          <input type="text" id="aiPlanGoal" placeholder="مثال: مطور ويب كامل Full Stack مع React و Node.js" style="width:100%; box-sizing:border-box; padding:8px 12px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">المستوى الحالي:</label>
+            <select id="aiPlanLevel" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+              <option value="مبتدئ من الصفر">مبتدئ من الصفر</option>
+              <option value="متوسط">متوسط</option>
+              <option value="متقدم">متقدم</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">الساعات أسبوعياً:</label>
+            <select id="aiPlanHours" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+              <option value="5">5 ساعات</option>
+              <option value="10" selected>10 ساعات</option>
+              <option value="15">15 ساعة</option>
+              <option value="20">20 ساعة</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="aiGenPlanBtn">
+          توليد الخطة الدراسية
+        </button>
+        <div id="aiPlanResult" style="margin-top:12px; font-size:13px; line-height:1.6; max-height:280px; overflow-y:auto; display:none; background:var(--canvas); padding:12px; border-radius:10px; border:1px solid var(--line);"></div>
+      </div>
+
+      <!-- TAB 4: CODING QUIZ & CHALLENGE -->
+      <div class="ai-tab-panel" id="aiTabPanelQuiz">
+        <div style="font-size:12.5px; color:var(--ink-soft); margin-bottom:12px;">
+          اختبر مهاراتك بتحديات برمجية وأسئلة ذكية يتم توليدها فورياً.
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+          <div>
+            <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">الموضوع:</label>
+            <input type="text" id="aiQuizTopic" value="JavaScript" placeholder="مثال: Python, SQL, React" style="width:100%; box-sizing:border-box; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+          </div>
+          <div>
+            <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">مستوى الصعوبة:</label>
+            <select id="aiQuizDifficulty" style="width:100%; padding:8px; border-radius:8px; border:1px solid var(--line); font-size:13px; background:var(--surface); color:var(--ink);">
+              <option value="مبتدئ">مبتدئ</option>
+              <option value="متوسط" selected>متوسط</option>
+              <option value="متقدم">متقدم</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="aiGenQuizBtn">
+          توليد تحدي برمجي جديد
+        </button>
+        <div id="aiQuizResult" style="margin-top:12px; font-size:13px; line-height:1.6; max-height:280px; overflow-y:auto; display:none; background:var(--canvas); padding:12px; border-radius:10px; border:1px solid var(--line);"></div>
+      </div>
+    </div>
   </div>
 </div>
 
 <!-- ============ REAL-TIME LIVE VOICE MODAL (gemini-3.8-live) ============ -->
 <div class="voice-modal-overlay" id="voiceModalOverlay">
   <div class="voice-card">
-    <button class="voice-close-btn" id="voiceCloseBtn" aria-label="إغلاق">✕</button>
+    <button class="voice-close-btn" id="voiceCloseBtn" aria-label="إغلاق">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
     <div class="voice-status-pill" id="voiceStatusPill">
       <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#38BDF8;"></span>
       <span id="voiceStatusText">جارٍ الاتصال بـ gemini-3.8-live...</span>

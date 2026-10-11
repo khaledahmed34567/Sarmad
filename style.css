@@ -744,3 +744,35 @@ p, .hint, li, .info span, .info h4, .info p, .kicker, blockquote{ white-space: p
 .science-info-card{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:var(--shadow-soft);}
 .science-provenance-badge{display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; font-size:11px; font-weight:600;}
 
+/* AI Quick Assistant Drawer */
+.ai-drawer-overlay{position:fixed; inset:0; background:rgba(15,23,42,.6); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); z-index:9990; display:none; justify-content:flex-start; align-items:flex-end; direction:rtl;}
+.ai-drawer-overlay.active{display:flex;}
+.ai-drawer{background:var(--surface); border:1px solid var(--line); width:100%; max-width:500px; height:88vh; max-height:780px; border-radius:24px 24px 0 0; margin-left:24px; box-shadow:0 -10px 40px rgba(0,0,0,.2); display:flex; flex-direction:column; overflow:hidden; animation:aiDrawerSlideUp .25s cubic-bezier(.16,1,.3,1);}
+@media(min-width:768px){.ai-drawer{border-radius:24px; margin-bottom:24px; height:82vh;}}
+@media(max-width:600px){.ai-drawer{margin-left:0; border-radius:20px 20px 0 0; height:92vh;}}
+@keyframes aiDrawerSlideUp{from{transform:translateY(100%); opacity:0;}to{transform:translateY(0); opacity:1;}}
+.ai-drawer-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); background:var(--canvas);}
+.ai-drawer-title{display:flex; align-items:center; gap:8px; font-weight:700; font-size:16px; color:var(--ink); font-family:'AppTitles',sans-serif;}
+.ai-badge-live{background:#E0F2FE; color:#0284C7; font-size:11px; padding:2px 8px; border-radius:999px; font-weight:600;}
+.ai-drawer-actions{display:flex; align-items:center; gap:8px;}
+.ai-expand-link, .ai-drawer-close{width:34px; height:34px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); display:flex; align-items:center; justify-content:center; cursor:pointer; text-decoration:none; transition:all .15s ease;}
+.ai-expand-link:hover, .ai-drawer-close:hover{background:var(--surface-2); color:var(--ink);}
+.ai-drawer-tabs{display:flex; gap:4px; padding:8px 16px; background:var(--canvas); border-bottom:1px solid var(--line); overflow-x:auto;}
+.ai-tab-btn{display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:10px; border:1px solid transparent; background:transparent; color:var(--ink-soft); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .15s ease;}
+.ai-tab-btn.active{background:var(--surface); border-color:var(--line); color:var(--emerald); box-shadow:0 2px 6px rgba(0,0,0,.04);}
+.ai-drawer-body{flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column;}
+.ai-tab-panel{display:none; flex-direction:column; flex:1;}
+.ai-tab-panel.active{display:flex;}
+.ai-drawer-messages{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-bottom:12px; min-height:240px; max-height:420px;}
+.ai-msg-bubble{display:flex; gap:8px; align-items:flex-start;}
+.ai-msg-bubble.user{justify-content:flex-end;}
+.ai-msg-bubble.user .ai-msg-body{background:var(--emerald); color:#fff; border-radius:16px 16px 4px 16px;}
+.ai-msg-bubble.model .ai-msg-body{background:var(--canvas); border:1px solid var(--line); color:var(--ink); border-radius:16px 16px 16px 4px;}
+.ai-msg-body{padding:10px 14px; font-size:13.5px; line-height:1.6; max-width:85%; word-break:break-word;}
+.ai-drawer-input-form{display:flex; gap:8px; padding-top:10px; border-top:1px solid var(--line); margin-top:auto;}
+.ai-drawer-input-form input{flex:1; border-radius:12px; border:1px solid var(--line); padding:10px 14px; font-family:inherit; font-size:13.5px; outline:none; background:var(--canvas); color:var(--ink);}
+.ai-drawer-input-form input:focus{border-color:var(--emerald); background:var(--surface);}
+.ai-drawer-input-form button{width:42px; height:42px; border-radius:12px; border:none; background:var(--emerald); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .15s ease;}
+.ai-drawer-input-form button:hover{transform:scale(1.05);}
+
+
