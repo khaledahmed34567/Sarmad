@@ -1,0 +1,7 @@
+{
+  "name": "سرمد | Sarmad",
+  "description": "منصة عربية متكاملة لتعلّم البرمجة والتقنية بلا حدود، مسارات تفاعلية ودورات وشهادات معتمدة.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>سرمد | Sarmad</title>
+<meta name="description" content="منصة عربية متكاملة لتعلّم البرمجة والتقنية بلا حدود، مسارات تفاعلية ودورات وشهادات معتمدة.">
+<meta property="og:title" content="سرمد | Sarmad">
+<meta property="og:description" content="منصة عربية متكاملة لتعلّم البرمجة والتقنية بلا حدود، مسارات تفاعلية ودورات وشهادات معتمدة.">
 <meta name="theme-color" content="#F9F5EB">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -25,6 +28,8 @@
 <link rel="preload" href="https://files.catbox.moe/4rjalb.otf" as="font" type="font/otf" crossorigin>
 
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.2/3Dmol-min.js"></script>
 </head>
 <body>
 
@@ -49,6 +54,8 @@
     </div>
     <a href="#/" data-close-menu>الرئيسية</a>
     <a href="#/tracks" data-close-menu>المسارات</a>
+    <a href="#/ai-chat" data-close-menu style="color:var(--emerald); font-weight:700;">المساعد الذكي ✦</a>
+    <a href="#/science-lab" data-close-menu style="color:#0D9488; font-weight:700;">المختبر العلمي 🧬</a>
     <a href="#/leaderboard" data-close-menu>المتصدرون</a>
     <a href="#/articles" data-close-menu>المقالات</a>
     <a href="#/forum" data-close-menu>المجتمع</a>
@@ -223,5 +230,69 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build); else build();
 })();
 </script>
+
+<!-- ============ FLOATING AI QUICK TRIGGER ============ -->
+<div class="ai-fab-container" id="aiFabContainer">
+  <button class="ai-fab-btn" id="aiFabBtn" aria-label="ذكاء سرمد" title="المساعد الذكي سرمد ✦">
+    <span class="ai-fab-sparkle">✦</span>
+    <span>ذكاء سرمد</span>
+  </button>
+  <div class="ai-fab-menu" id="aiFabMenu">
+    <a href="#/ai-chat" class="ai-fab-item">
+      <span class="ai-fab-item-icon">💬</span>
+      <div class="ai-fab-item-info">
+        <strong>المساعد الذكي (Gemini Chat)</strong>
+        <small>محادثات ذكية متعددة الجولات وشرح الأكواد</small>
+      </div>
+    </a>
+    <button class="ai-fab-item" id="aiFabVoiceBtn" type="button">
+      <span class="ai-fab-item-icon">🎙️</span>
+      <div class="ai-fab-item-info">
+        <strong>محادثة صوتية حية (Live API)</strong>
+        <small>تحدث مباشرة في الوقت الفعلي مع gemini-3.8-live</small>
+      </div>
+    </button>
+    <a href="#/science-lab" class="ai-fab-item">
+      <span class="ai-fab-item-icon">🧬</span>
+      <div class="ai-fab-item-info">
+        <strong>المختبر العلمي الذكي (Science Lab)</strong>
+        <small>مجسمات بروتينات ثلاثية الأبعاد ومركبات دوائية</small>
+      </div>
+    </a>
+  </div>
+</div>
+
+<!-- ============ REAL-TIME LIVE VOICE MODAL (gemini-3.8-live) ============ -->
+<div class="voice-modal-overlay" id="voiceModalOverlay">
+  <div class="voice-card">
+    <button class="voice-close-btn" id="voiceCloseBtn" aria-label="إغلاق">✕</button>
+    <div class="voice-status-pill" id="voiceStatusPill">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#38BDF8;"></span>
+      <span id="voiceStatusText">جارٍ الاتصال بـ gemini-3.8-live...</span>
+    </div>
+    <h3 style="font-size:18px; margin:0 0 8px; font-family:'AppTitles',sans-serif;">المحادثة الصوتية المباشرة</h3>
+    <p style="font-size:13px; color:#94A3B8; margin:0 0 16px;">تحدث بشكل طبيعي باللغة العربية، والمساعد يستمع ويرد في الوقت الفعلي.</p>
+    
+    <div class="voice-visualizer" id="voiceVisualizer">
+      <div class="voice-pulse-circle">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </div>
+    </div>
+    
+    <div id="voiceTranscriptBox" style="min-height:48px; font-size:14px; color:#E2E8F0; line-height:1.6; background:rgba(255,255,255,.05); border-radius:12px; padding:10px 14px; margin-bottom:12px;">
+      الميكروفون نشط.. يمكنك البدء بالتحدث الآن.
+    </div>
+
+    <div class="voice-controls">
+      <button class="voice-action-btn voice-interrupt-btn" id="voiceInterruptBtn" type="button">
+        مقاطعة الحديث
+      </button>
+      <button class="voice-action-btn voice-stop-btn" id="voiceStopBtn" type="button">
+        إنهاء الجلسة
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

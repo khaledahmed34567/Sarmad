@@ -958,7 +958,7 @@ async function router(){
   // allowed. The one exception is the public certificate-verification page
   // — that's meant to be checkable by anyone (an employer, for instance)
   // who isn't a registered student at all.
-  if (!session.user && name !== 'certificate') {
+  if (!session.user && !['certificate', 'ai-chat', 'science-lab', 'home', 'tracks', 'leaderboard', 'articles'].includes(name)) {
     renderLoginRequired();
     doneTopLoader();
     return;
@@ -973,6 +973,8 @@ async function router(){
   try {
     if (name==='home') await renderHome();
     else if (name==='tracks') await renderAllTracks();
+    else if (name==='ai-chat') await renderAiChat();
+    else if (name==='science-lab') await renderScienceLab();
     else if (name==='courses') await renderAllCourses();
     else if (name==='track') await renderTrack(param);
     else if (name==='course') await renderCourse(param);
@@ -4022,6 +4024,933 @@ function initCookieConsent(){
 }
 
 /* =====================================================================
+   AI ASSISTANT (GEMINI CHAT, SEARCH GROUNDING & LIVE API)
+   ===================================================================== */
+let _chatHistory = [];
+let _chatModel = 'gemini-3.5-flash';
+let _chatPersona = 'coder';
+let _useSearch = false;
+let _liveVoice = null;
+
+const AI_PERSONAS = {
+  coder: 'أنت مرشد البرمجة وتصحيح الأخطاء الذكي في منصة سرمد. تشرح الخوارزميات وتكتب أكواداً احترافية موثقة بلغات Python، JavaScript، TypeScript، C++، وتساعد في تصحيح الأخطاء وتقديم أفضل الممارسات البرمجية باللغة العربية.',
+  scientist: 'أنت خبير العلوم والمعلوماتية الحيوية في منصة سرمد. تشرح البنى الجزيئية ثلاثية الأبعاد للبروتينات المتوقعة بواسطة AlphaFold، والجينات، والمركبات الدوائية، والبيولوجيا الجزيئية بدقة علمية عالية باللغة العربية.',
+  mentor: 'أنت المستشار التعليمي الأكاديمي لمنصة سرمد. توجه الطلاب لاختيار المسارات البرمجية المناسبة، وتشرح لهم كيفية التدرج في التعلم والحصول على الشهادات المعتمدة في المنصة.'
+};
+
+function renderChatMessagesHtml() {
+  if (!_chatHistory.length) {
+    return `
+      <div style="text-align:center; padding:48px 16px; color:var(--ink-soft);">
+        <div style="font-size:36px; margin-bottom:12px;">✦</div>
+        <div style="font-family:'AppTitles'; font-size:18px; color:var(--ink); margin-bottom:6px;">مرحباً بك في مساعد سرمد الذكي!</div>
+        <div style="font-size:13.5px; max-width:440px; margin:0 auto; line-height:1.6;">
+          اسألني عن أي مفهوم برمجي، تصحيح كود، مسارات التعلم، أو ابحث في الويب مباشرة عبر Google Search.
+        </div>
+      </div>
+    `;
+  }
+
+  return _chatHistory.map(msg => {
+    const isUser = msg.role === 'user';
+    let formattedText = escapeHtml(msg.text);
+    if (!isUser && typeof marked !== 'undefined') {
+      try {
+        formattedText = marked.parse(msg.text);
+      } catch (_) {}
+    }
+
+    let sourcesHtml = '';
+    if (msg.groundingChunks && msg.groundingChunks.length > 0) {
+      const items = msg.groundingChunks
+        .filter(c => c.web?.uri)
+        .map(c => `
+          <a class="source-pill-link" href="${escapeHtml(c.web.uri)}" target="_blank" rel="noopener">
+            <span>🌐</span>
+            <span>${escapeHtml(c.web.title || c.web.uri)}</span>
+          </a>
+        `).join('');
+      if (items) {
+        sourcesHtml = `
+          <div style="margin-top:10px;">
+            <div style="font-size:11px; font-weight:700; color:var(--ink-soft); margin-bottom:4px;">مصادر البحث الموثوقة (Google Search):</div>
+            <div class="source-pill-box">${items}</div>
+          </div>
+        `;
+      }
+    }
+
+    return `
+      <div class="chat-msg-row ${isUser ? 'user' : 'ai'}">
+        <div class="chat-avatar">${isUser ? '👤' : '✦'}</div>
+        <div class="chat-bubble">
+          <div>${formattedText}</div>
+          ${sourcesHtml}
+          <div class="chat-meta-bar">
+            <span>${msg.modelUsed ? `بواسطة ${escapeHtml(msg.modelUsed)}` : (isUser ? 'أنت' : 'سرمد AI')}</span>
+            <span>•</span>
+            <span>${new Date(msg.timestamp || Date.now()).toLocaleTimeString('ar-EG', { hour:'2-digit', minute:'2-digit' })}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderAiChat(){
+  appRoot.innerHTML = `
+    <div class="ai-chat-shell">
+      <div class="ai-hero">
+        <h1><span>✦</span> المساعد الذكي — سرمد AI</h1>
+        <p>مساعدك المتقدم لتعلم البرمجة وهندسة البرمجيات والعلوم. يدعم المحادثات متعددة الجولات، البحث الحي عبر Google، وتوليد وتحليل الأكواد البرمجية بأحدث نماذج Gemini.</p>
+      </div>
+
+      <div class="ai-controls-bar">
+        <!-- Model Selection -->
+        <div class="ai-chips-group">
+          <span class="ai-chips-label">النموذج:</span>
+          <button class="ai-chip ${_chatModel==='gemini-3.1-flash-lite'?'active':''}" data-model="gemini-3.1-flash-lite" type="button">⚡ فائق السرعة (3.1-flash-lite)</button>
+          <button class="ai-chip ${_chatModel==='gemini-3.5-flash'?'active':''}" data-model="gemini-3.5-flash" type="button">🌐 متوازن وعام (3.5-flash)</button>
+          <button class="ai-chip ${_chatModel==='gemini-3.1-pro-preview'?'active':''}" data-model="gemini-3.1-pro-preview" type="button">🧠 برمجة وتفكير معقد (3.1-pro)</button>
+        </div>
+
+        <!-- Persona Selection & Search Toggle -->
+        <div class="ai-chips-group">
+          <span class="ai-chips-label">الدور:</span>
+          <button class="ai-chip ${_chatPersona==='coder'?'active':''}" data-persona="coder" type="button">👨‍💻 خبير البرمجة وتصحيح الأخطاء</button>
+          <button class="ai-chip ${_chatPersona==='scientist'?'active':''}" data-persona="scientist" type="button">🧬 باحث العلوم والمعلوماتية الحيوية</button>
+          <button class="ai-chip ${_chatPersona==='mentor'?'active':''}" data-persona="mentor" type="button">🎓 مستشار مسارات سرمد</button>
+          
+          <span style="flex:1;"></span>
+          <button class="ai-chip search-toggle ${_useSearch?'active':''}" id="searchToggleBtn" type="button">
+            🔍 بحث Google المباشر (Search Grounding)
+          </button>
+          <button class="ai-chip" id="openVoiceFromChatBtn" type="button" style="background:#0284C7; color:#fff; border-color:#0284C7;">
+            🎙️ محادثة صوتية حية (Live API)
+          </button>
+        </div>
+      </div>
+
+      <div class="ai-quick-prompts">
+        <button class="ai-quick-prompt-btn" data-prompt="اشرح لي بنية بيانات الأشجار الثنائية Binary Search Tree في بايثون مع مثال عملي">بنية الأشجار الثنائية (BST)</button>
+        <button class="ai-quick-prompt-btn" data-prompt="ما هي أحدث مستجدات الذكاء الاصطناعي والحوسبة الكمومية في عام 2026؟">أحدث تقنيات 2026 (بحث جوجل)</button>
+        <button class="ai-quick-prompt-btn" data-prompt="اشرح لي كيف يرتبط بروتين p53 بالحمض النووي لمنع انتشار السرطان وما هو تركيبه ثلاثي الأبعاد؟">بروتين p53 والأورام (علوم)</button>
+        <button class="ai-quick-prompt-btn" data-prompt="ما هو المسار التعليمي الأفضل في سرمد لأصبح مطور ويب متكامل Full-Stack؟">مسار تطوير الويب في سرمد</button>
+        <button class="ai-quick-prompt-btn" data-prompt="اكتب لي كود React لحساب المسافة والسرعة باستخدام خطوط العرض والطول">كود حساب المسافات الجغرافية</button>
+      </div>
+
+      <div class="chat-thread-card">
+        <div class="chat-messages-area" id="chatMessagesArea">
+          ${renderChatMessagesHtml()}
+        </div>
+
+        <form class="chat-input-bar" id="chatForm">
+          <button type="button" class="chat-voice-trigger-btn" id="chatVoiceMicBtn" title="تحدث بصوتك مباشرة عبر Live API">
+            🎙️
+          </button>
+          <textarea id="chatInputText" placeholder="اكتب سؤالك، استفسارك البرمجي، أو فكرتك هنا..." rows="1"></textarea>
+          <button type="submit" class="chat-send-btn" id="chatSendBtn">
+            إرسال
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  bindAiChatEvents();
+}
+
+function bindAiChatEvents() {
+  const chatArea = document.getElementById('chatMessagesArea');
+  const chatForm = document.getElementById('chatForm');
+  const chatInput = document.getElementById('chatInputText');
+  const searchToggle = document.getElementById('searchToggleBtn');
+  const voiceBtn = document.getElementById('chatVoiceMicBtn');
+  const openVoiceBtn = document.getElementById('openVoiceFromChatBtn');
+
+  // Auto scroll
+  if (chatArea) chatArea.scrollTop = chatArea.scrollHeight;
+
+  // Model chips
+  document.querySelectorAll('.ai-chip[data-model]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ai-chip[data-model]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _chatModel = btn.dataset.model;
+    });
+  });
+
+  // Persona chips
+  document.querySelectorAll('.ai-chip[data-persona]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ai-chip[data-persona]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _chatPersona = btn.dataset.persona;
+    });
+  });
+
+  // Search Toggle
+  if (searchToggle) {
+    searchToggle.addEventListener('click', () => {
+      _useSearch = !_useSearch;
+      searchToggle.classList.toggle('active', _useSearch);
+      if (_useSearch) {
+        // Search Grounding requires gemini-3.5-flash as specified
+        _chatModel = 'gemini-3.5-flash';
+        document.querySelectorAll('.ai-chip[data-model]').forEach(b => {
+          b.classList.toggle('active', b.dataset.model === 'gemini-3.5-flash');
+        });
+      }
+    });
+  }
+
+  // Quick Prompt chips
+  document.querySelectorAll('.ai-quick-prompt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (chatInput) {
+        chatInput.value = btn.dataset.prompt;
+        chatInput.focus();
+      }
+    });
+  });
+
+  // Voice Launchers
+  const openVoiceModal = () => {
+    const modal = document.getElementById('voiceModalOverlay');
+    if (modal) modal.classList.add('active');
+    if (!_liveVoice) _liveVoice = new LiveVoiceManager();
+    _liveVoice.start();
+  };
+  if (voiceBtn) voiceBtn.addEventListener('click', openVoiceModal);
+  if (openVoiceBtn) openVoiceBtn.addEventListener('click', openVoiceModal);
+
+  // Auto-expand textarea
+  if (chatInput) {
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.dispatchEvent(new Event('submit'));
+      }
+    });
+  }
+
+  // Submit Handler
+  if (chatForm) {
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = (chatInput.value || '').trim();
+      if (!text) return;
+
+      chatInput.value = '';
+
+      // Append user message
+      _chatHistory.push({
+        role: 'user',
+        text,
+        timestamp: Date.now()
+      });
+
+      // Temporary loading indicator
+      _chatHistory.push({
+        role: 'model',
+        text: 'جارٍ التفكير ومعالجة الإجابة...',
+        isLoading: true,
+        timestamp: Date.now()
+      });
+
+      chatArea.innerHTML = renderChatMessagesHtml();
+      chatArea.scrollTop = chatArea.scrollHeight;
+
+      try {
+        const payloadMessages = _chatHistory
+          .filter(m => !m.isLoading)
+          .map(m => ({
+            role: m.role,
+            content: m.text
+          }));
+
+        const res = await fetch('/api/gemini/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: payloadMessages,
+            model: _chatModel,
+            useSearch: _useSearch,
+            systemInstruction: AI_PERSONAS[_chatPersona] || AI_PERSONAS.coder
+          })
+        });
+
+        const data = await res.json();
+        // Remove loading message
+        _chatHistory.pop();
+
+        if (res.ok && data.text) {
+          _chatHistory.push({
+            role: 'model',
+            text: data.text,
+            groundingChunks: data.groundingChunks || [],
+            modelUsed: data.modelUsed || _chatModel,
+            timestamp: Date.now()
+          });
+        } else {
+          _chatHistory.push({
+            role: 'model',
+            text: data.error || 'عذراً، حدث خطأ أثناء الاتصال بنموذج الذكاء الاصطناعي. يرجى المحاولة مرة أخرى.',
+            timestamp: Date.now()
+          });
+        }
+      } catch (err) {
+        _chatHistory.pop();
+        _chatHistory.push({
+          role: 'model',
+          text: 'تعذر الاتصال بالخادم: ' + (err.message || 'خطأ في الشبكة'),
+          timestamp: Date.now()
+        });
+      }
+
+      chatArea.innerHTML = renderChatMessagesHtml();
+      chatArea.scrollTop = chatArea.scrollHeight;
+    });
+  }
+}
+
+/* =====================================================================
+   LIVE VOICE CONVERSATION MANAGER (gemini-3.8-live WebSockets + WebAudio)
+   ===================================================================== */
+class LiveVoiceManager {
+  constructor() {
+    this.ws = null;
+    this.inputAudioCtx = null;
+    this.outputAudioCtx = null;
+    this.processor = null;
+    this.micStream = null;
+    this.nextStartTime = 0;
+    this.scheduledSources = [];
+    this.isActive = false;
+  }
+
+  async start() {
+    if (this.isActive) return;
+    this.isActive = true;
+    this.updateStatus('جارٍ تهيئة الميكروفون والاتصال...', '#38BDF8');
+
+    try {
+      this.micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
+
+      this.inputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      this.outputAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+      this.nextStartTime = this.outputAudioCtx.currentTime;
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${location.host}/api/live`;
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.updateStatus('متصل بـ gemini-3.8-live — استمع وتحدث بحرية', '#34D399');
+        this.startMicRecording();
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'ready') {
+            this.updateStatus('المساعد جاهز ويستمع إليك الآن..', '#38BDF8');
+          } else if (msg.type === 'audio' && msg.audio) {
+            this.playAudioChunk(msg.audio);
+          } else if (msg.type === 'text' && msg.text) {
+            const transcript = document.getElementById('voiceTranscriptBox');
+            if (transcript) transcript.textContent = msg.text;
+          } else if (msg.type === 'interrupted') {
+            this.stopPlayback();
+            this.updateStatus('تمت المقاطعة — يستمع إليك الآن..', '#F59E0B');
+          } else if (msg.type === 'turnComplete') {
+            this.setVisualizerSpeaking(false);
+          } else if (msg.type === 'error') {
+            this.updateStatus(msg.error || 'خطأ في الاتصال', '#EF4444');
+          }
+        } catch (e) {
+          console.error('WS parse error:', e);
+        }
+      };
+
+      this.ws.onerror = (err) => {
+        console.error('Live WS error:', err);
+        this.updateStatus('تعذر الاتصال بالخادم الصوتي المباشر', '#EF4444');
+      };
+
+      this.ws.onclose = () => {
+        this.updateStatus('تم إنهاء جلسة الصوت المباشر', '#94A3B8');
+        this.cleanup();
+      };
+
+    } catch (err) {
+      console.error('Live Voice Start Error:', err);
+      this.updateStatus('فشل الوصول للميكروفون أو بدء الصوت: ' + err.message, '#EF4444');
+      this.cleanup();
+    }
+  }
+
+  startMicRecording() {
+    if (!this.inputAudioCtx || !this.micStream) return;
+    const source = this.inputAudioCtx.createMediaStreamSource(this.micStream);
+    this.processor = this.inputAudioCtx.createScriptProcessor(4096, 1, 1);
+
+    source.connect(this.processor);
+    this.processor.connect(this.inputAudioCtx.destination);
+
+    this.processor.onaudioprocess = (e) => {
+      if (!this.isActive || !this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      const inputData = e.inputBuffer.getChannelData(0);
+      
+      const pcm16 = new Int16Array(inputData.length);
+      for (let i = 0; i < inputData.length; i++) {
+        const s = Math.max(-1, Math.min(1, inputData[i]));
+        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+
+      let binary = '';
+      const bytes = new Uint8Array(pcm16.buffer);
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64Audio = btoa(binary);
+
+      this.ws.send(JSON.stringify({
+        type: 'audio',
+        audio: base64Audio
+      }));
+    };
+  }
+
+  playAudioChunk(base64Data) {
+    if (!this.outputAudioCtx) return;
+    this.setVisualizerSpeaking(true);
+
+    try {
+      const binary = atob(base64Data);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const pcm16 = new Int16Array(bytes.buffer);
+
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) {
+        float32[i] = pcm16[i] / (pcm16[i] < 0 ? 32768 : 32767);
+      }
+
+      const buffer = this.outputAudioCtx.createBuffer(1, float32.length, 24000);
+      buffer.copyToChannel(float32, 0);
+
+      const source = this.outputAudioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.outputAudioCtx.destination);
+
+      const now = this.outputAudioCtx.currentTime;
+      if (this.nextStartTime < now) {
+        this.nextStartTime = now;
+      }
+      source.start(this.nextStartTime);
+      this.nextStartTime += buffer.duration;
+      this.scheduledSources.push(source);
+
+      source.onended = () => {
+        const idx = this.scheduledSources.indexOf(source);
+        if (idx !== -1) this.scheduledSources.splice(idx, 1);
+        if (this.scheduledSources.length === 0) {
+          this.setVisualizerSpeaking(false);
+        }
+      };
+    } catch (e) {
+      console.error('Audio chunk playback error:', e);
+    }
+  }
+
+  stopPlayback() {
+    for (const src of this.scheduledSources) {
+      try { src.stop(); } catch (_) {}
+    }
+    this.scheduledSources = [];
+    if (this.outputAudioCtx) {
+      this.nextStartTime = this.outputAudioCtx.currentTime;
+    }
+    this.setVisualizerSpeaking(false);
+  }
+
+  interrupt() {
+    this.stopPlayback();
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'text', text: 'مقاطعة' }));
+    }
+  }
+
+  updateStatus(text, color) {
+    const elText = document.getElementById('voiceStatusText');
+    const elPill = document.getElementById('voiceStatusPill');
+    if (elText) elText.textContent = text;
+    if (elPill && color) {
+      const dot = elPill.querySelector('span');
+      if (dot) dot.style.background = color;
+      elPill.style.color = color;
+    }
+  }
+
+  setVisualizerSpeaking(speaking) {
+    const viz = document.getElementById('voiceVisualizer');
+    if (viz) {
+      if (speaking) viz.classList.add('speaking');
+      else viz.classList.remove('speaking');
+    }
+  }
+
+  cleanup() {
+    this.isActive = false;
+    this.stopPlayback();
+    if (this.processor) {
+      try { this.processor.disconnect(); } catch (_) {}
+      this.processor = null;
+    }
+    if (this.micStream) {
+      this.micStream.getTracks().forEach(t => t.stop());
+      this.micStream = null;
+    }
+    if (this.inputAudioCtx) {
+      try { this.inputAudioCtx.close(); } catch (_) {}
+      this.inputAudioCtx = null;
+    }
+    if (this.outputAudioCtx) {
+      try { this.outputAudioCtx.close(); } catch (_) {}
+      this.outputAudioCtx = null;
+    }
+    if (this.ws) {
+      if (this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      }
+      this.ws = null;
+    }
+    this.setVisualizerSpeaking(false);
+  }
+
+  stop() {
+    this.cleanup();
+    const modal = document.getElementById('voiceModalOverlay');
+    if (modal) modal.classList.remove('active');
+  }
+}
+
+/* =====================================================================
+   SCIENCE LAB WORKBENCH (3Dmol.js, AlphaFold pLDDT, PubChem & Gemini)
+   ===================================================================== */
+let _currentBioId = 'P04637';
+let _currentBioType = 'protein';
+let _currentViewer = null;
+
+async function renderScienceLab(){
+  appRoot.innerHTML = `
+    <div class="science-shell">
+      <div class="science-hero">
+        <h1><span>🧬</span> مختبر سرمد العلمي الذكي (Science & BioLab)</h1>
+        <p>استكشف البنى الجزيئية ثلاثية الأبعاد للبروتينات المتوقعة بواسطة AlphaFold وتجارب PDB، وحلل المركبات الكيميائية والأدوية من PubChem، مع شرح علمي دقيق مدعوم بذكاء Gemini الاصطناعي.</p>
+        
+        <div class="ai-chips-group" style="margin-top:14px;">
+          <span class="ai-chips-label">نماذج جاهزة للتجربة:</span>
+          <button class="ai-chip active" data-bio="P04637" data-type="protein">🧬 TP53 (مثبط الأورام p53)</button>
+          <button class="ai-chip" data-bio="P38398" data-type="protein">🧬 BRCA1 (إصلاح الـ DNA)</button>
+          <button class="ai-chip" data-bio="P0DTC2" data-type="protein">🦠 Spike (سبايك كورونا)</button>
+          <button class="ai-chip" data-bio="P01308" data-type="protein">💉 Insulin (الإنسولين البشري)</button>
+          <button class="ai-chip" data-bio="Imatinib" data-type="compound">💊 Imatinib (دواء اللوكيميا)</button>
+          <button class="ai-chip" data-bio="Aspirin" data-type="compound">💊 Aspirin (الأسبرين)</button>
+          <button class="ai-chip" data-bio="Caffeine" data-type="compound">☕ Caffeine (الكافيين)</button>
+          <button class="ai-chip" data-bio="Metformin" data-type="compound">💊 Metformin (الميتفورمين)</button>
+        </div>
+      </div>
+
+      <!-- Search & Custom Identifier Input -->
+      <div class="ai-controls-bar" style="margin-bottom:20px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input type="text" id="scienceSearchInput" placeholder="أدخل معرف UniProt (مثال: P04637) أو PDB ID (مثال: 1TUP) أو اسم مركب (مثال: Paracetamol)..." style="flex:1; padding:12px 16px; border-radius:14px; border:1px solid var(--line); font-family:inherit; font-size:14px;">
+          <button class="btn btn-primary" id="scienceSearchBtn" type="button">بحث واستعراض</button>
+        </div>
+      </div>
+
+      <div class="science-grid">
+        <!-- 3D Molecular / Chemical Canvas -->
+        <div class="science-info-card" style="padding:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:16px; margin:0; display:flex; align-items:center; gap:8px;">
+              <span>🔬</span> المجسم التفاعلي ثلاثي الأبعاد (WebGL 3Dmol)
+            </h3>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-ghost btn-sm" id="molResetViewBtn" type="button">إعادة التوسيط</button>
+              <button class="btn btn-ghost btn-sm" id="molSpinBtn" type="button">تدوير تلقائي</button>
+            </div>
+          </div>
+
+          <div class="mol-viewer-container" id="molViewerContainer">
+            <div id="molViewer" style="width:100%; height:100%; position:relative;"></div>
+            
+            <div class="plddt-legend-bar" id="plddtLegend">
+              <span style="font-weight:700;">مقياس ثقة AlphaFold pLDDT:</span>
+              <div class="plddt-item"><span class="plddt-dot" style="background:#0053D6;"></span><span>مرتفعة جداً (&gt;90)</span></div>
+              <div class="plddt-item"><span class="plddt-dot" style="background:#65CBF3;"></span><span>واثقة (70-90)</span></div>
+              <div class="plddt-item"><span class="plddt-dot" style="background:#FFDB13;"></span><span>منخفضة (50-70)</span></div>
+              <div class="plddt-item"><span class="plddt-dot" style="background:#FF7D45;"></span><span>منخفضة جداً (&lt;50)</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metadata & AI Analysis Panel -->
+        <div class="science-info-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+            <div>
+              <span class="science-provenance-badge" id="bioProvenanceBadge">AlphaFold DB (توقع AI)</span>
+              <h2 id="bioTitle" style="font-family:'AppTitles',sans-serif; font-size:20px; margin:8px 0 4px;">Cellular Tumor Antigen p53</h2>
+              <div id="bioSub" style="font-size:12.5px; color:var(--ink-soft);">UniProt: P04637 | Homo sapiens</div>
+            </div>
+          </div>
+
+          <div id="bioDetailsContainer" style="font-size:13.5px; line-height:1.7; color:var(--ink); margin-bottom:18px;">
+            جاري تحميل تفاصيل البنية والمعلومات الحيوية...
+          </div>
+
+          <!-- AI Scientific Explanation Trigger -->
+          <button class="btn btn-primary" id="aiScienceAnalyzeBtn" style="width:100%; margin-bottom:18px;" type="button">
+            ✦ تحليل البنية والأهمية الدوائية بواسطة Gemini
+          </button>
+
+          <div id="aiAnalysisResultBox" style="display:none; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:14px; padding:16px; font-size:13.5px; line-height:1.7;">
+            <div style="font-weight:700; color:var(--emerald); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+              <span>✦</span> تحليل الذكاء الاصطناعي (Gemini Science Analysis):
+            </div>
+            <div id="aiAnalysisText"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Biomedical Literature & Studies -->
+      <div class="science-info-card" style="margin-top:20px;">
+        <h3 style="font-size:16px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+          <span>📚</span> أحدث الأوراق البحثية والمراجع الطبية (Europe PMC & PubMed)
+        </h3>
+        <div id="scienceLitContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+          جاري البحث في الأوراق الأكاديمية...
+        </div>
+      </div>
+    </div>
+  `;
+
+  bindScienceLabEvents();
+  loadProteinStructure('P04637');
+}
+
+function bindScienceLabEvents() {
+  document.querySelectorAll('.ai-chip[data-bio]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.ai-chip[data-bio]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const bioId = btn.dataset.bio;
+      const type = btn.dataset.type;
+      _currentBioId = bioId;
+      _currentBioType = type;
+
+      const resultBox = document.getElementById('aiAnalysisResultBox');
+      if (resultBox) resultBox.style.display = 'none';
+
+      if (type === 'protein') {
+        loadProteinStructure(bioId);
+      } else {
+        loadChemicalCompound(bioId);
+      }
+    });
+  });
+
+  const searchBtn = document.getElementById('scienceSearchBtn');
+  const searchInput = document.getElementById('scienceSearchInput');
+  const triggerSearch = () => {
+    const val = (searchInput?.value || '').trim();
+    if (!val) return;
+    document.querySelectorAll('.ai-chip[data-bio]').forEach(b => b.classList.remove('active'));
+    _currentBioId = val;
+    const resultBox = document.getElementById('aiAnalysisResultBox');
+    if (resultBox) resultBox.style.display = 'none';
+
+    // If matches PDB or UniProt format
+    if (/^[0-9][A-Z0-9]{3}$/i.test(val) || /^[OPQ][0-9][A-Z0-9]{3}[0-9]$/i.test(val) || /^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(val)) {
+      _currentBioType = 'protein';
+      loadProteinStructure(val);
+    } else {
+      _currentBioType = 'compound';
+      loadChemicalCompound(val);
+    }
+  };
+  if (searchBtn) searchBtn.addEventListener('click', triggerSearch);
+  if (searchInput) {
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') triggerSearch();
+    });
+  }
+
+  // View controls
+  const resetBtn = document.getElementById('molResetViewBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (_currentViewer) {
+        _currentViewer.zoomTo();
+        _currentViewer.render();
+      }
+    });
+  }
+
+  let isSpinning = false;
+  const spinBtn = document.getElementById('molSpinBtn');
+  if (spinBtn) {
+    spinBtn.addEventListener('click', () => {
+      if (!_currentViewer) return;
+      isSpinning = !isSpinning;
+      spinBtn.textContent = isSpinning ? 'إيقاف التدوير' : 'تدوير تلقائي';
+      _currentViewer.spin(isSpinning ? 'y' : false, 1);
+    });
+  }
+
+  // AI Science Analysis
+  const aiAnalyzeBtn = document.getElementById('aiScienceAnalyzeBtn');
+  if (aiAnalyzeBtn) {
+    aiAnalyzeBtn.addEventListener('click', async () => {
+      const resultBox = document.getElementById('aiAnalysisResultBox');
+      const resultText = document.getElementById('aiAnalysisText');
+      if (!resultBox || !resultText) return;
+
+      resultBox.style.display = 'block';
+      resultText.innerHTML = '<em>جارٍ استدعاء Gemini وإجراء البحث والتحليل العلمي الدقيق...</em>';
+
+      try {
+        const promptText = _currentBioType === 'protein'
+          ? `قم بتحليل علمي شامل للبروتين ذو المعرف (${_currentBioId}). اشرح وظيفته الحيوية في الخلية، آليات عمله، بنيته ثلاثية الأبعاد، دوره في الأمراض والسرطان، وتطبيقاته الصيدلانية باللغة العربية بأسلوب علمي رصين ومنسق.`
+          : `قم بتحليل صيدلاني وكيميائي شامل للمركب (${_currentBioId}). اشرح تركيبه الكيميائي، آلية تأثيره الحيوي (Mechanism of Action)، الاستخدامات الطبية المعتمدة، والتأثيرات الجانبية باللغة العربية بأسلوب علمي رصين ومنسق.`;
+
+        const res = await fetch('/api/gemini/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: promptText }],
+            model: 'gemini-3.5-flash',
+            useSearch: true,
+            systemInstruction: 'أنت باحث خبير في المعلوماتية الحيوية والكيمياء الحيوية والأدوية. تقدم شروحاً علمية دقيقة وموثقة باللغة العربية.'
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.text) {
+          resultText.innerHTML = typeof marked !== 'undefined' ? marked.parse(data.text) : escapeHtml(data.text);
+        } else {
+          resultText.textContent = data.error || 'تعذر استرجاع التحليل العلمي في الوقت الحالي.';
+        }
+      } catch (e) {
+        resultText.textContent = 'حدث خطأ أثناء التحليل: ' + e.message;
+      }
+    });
+  }
+}
+
+async function loadProteinStructure(id) {
+  const container = document.getElementById('molViewer');
+  const legend = document.getElementById('plddtLegend');
+  if (legend) legend.style.display = 'flex';
+  if (!container || typeof $3Dmol === 'undefined') return;
+
+  container.innerHTML = '';
+  _currentViewer = $3Dmol.createViewer(container, {
+    defaultcolors: $3Dmol.rasmolElementColors,
+    backgroundColor: '#0F172A'
+  });
+
+  try {
+    const res = await fetch(`/api/science/protein/${encodeURIComponent(id)}`);
+    const data = await res.json();
+    
+    document.getElementById('bioTitle').textContent = data.uniprotDescription || data.title || data.id;
+    document.getElementById('bioSub').textContent = `المعرف: ${data.id} | ${data.organism || 'بيانات حيوية'}`;
+    document.getElementById('bioProvenanceBadge').textContent = data.source || 'AlphaFold DB';
+
+    const cifRes = await fetch(data.cifUrl);
+    const cifText = await cifRes.text();
+
+    _currentViewer.clear();
+    _currentViewer.addModel(cifText, 'cif');
+
+    // AlphaFold pLDDT 4-color spectrum
+    _currentViewer.setStyle({}, {
+      cartoon: {
+        colorfunc: (atom) => {
+          const b = atom.b;
+          if (b > 90) return '#0053D6';
+          if (b > 70) return '#65CBF3';
+          if (b > 50) return '#FFDB13';
+          return '#FF7D45';
+        }
+      }
+    });
+
+    _currentViewer.zoomTo();
+    _currentViewer.render();
+
+    document.getElementById('bioDetailsContainer').innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div><strong>الجين المرتبط:</strong> ${escapeHtml(data.gene || id)}</div>
+        ${data.sequenceLength ? `<div><strong>طول السلسلة:</strong> ${data.sequenceLength} حمض أميني</div>` : ''}
+        <div><strong>صيغة الإحداثيات:</strong> mmCIF / BinaryCIF متوافقة</div>
+        <div><strong>رابط التحميل المباشر:</strong> <a href="${escapeHtml(data.cifUrl)}" target="_blank" rel="noopener">ملف الإحداثيات (.cif)</a></div>
+      </div>
+    `;
+
+    loadBiomedicalLiterature(data.gene || data.uniprotId || id);
+  } catch (err) {
+    console.error('Error loading protein:', err);
+    container.innerHTML = `<div style="padding:20px; color:#EF4444; text-align:center;">تعذر تحميل البنية ثلاثية الأبعاد: ${err.message}</div>`;
+  }
+}
+
+async function loadChemicalCompound(name) {
+  const container = document.getElementById('molViewer');
+  const legend = document.getElementById('plddtLegend');
+  if (legend) legend.style.display = 'none';
+  if (!container) return;
+
+  try {
+    const res = await fetch(`/api/science/compound/${encodeURIComponent(name)}`);
+    const data = await res.json();
+
+    document.getElementById('bioTitle').textContent = data.iupacName || data.name;
+    document.getElementById('bioSub').textContent = `المركب: ${data.name} | CID: ${data.cid || 'N/A'}`;
+    document.getElementById('bioProvenanceBadge').textContent = 'PubChem Compound (Chemical Database)';
+
+    if (data.imageUrl) {
+      container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; background:#0F172A; padding:20px;">
+          <img src="${data.imageUrl}" alt="${escapeHtml(data.name)}" style="max-height:280px; max-width:90%; background:#fff; border-radius:12px; padding:12px;">
+          <div style="color:#94A3B8; font-size:12px; margin-top:10px;">المخطط البنائي ثنائي الأبعاد (PubChem 2D Structure)</div>
+        </div>
+      `;
+    }
+
+    document.getElementById('bioDetailsContainer').innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <div><strong>الصيغة الجزيئية:</strong> <code style="font-family:monospace; background:#E2E8F0; padding:2px 6px; border-radius:4px;">${escapeHtml(data.formula || '')}</code></div>
+        <div><strong>الوزن الجزيئي:</strong> ${escapeHtml(data.weight || '')} g/mol</div>
+        <div><strong>رمز SMILES:</strong> <code style="font-family:monospace; font-size:11px; word-break:break-all; background:#E2E8F0; padding:2px 6px; border-radius:4px;">${escapeHtml(data.smiles || '')}</code></div>
+        ${data.pubchemUrl ? `<div><strong>صفحة المركب:</strong> <a href="${escapeHtml(data.pubchemUrl)}" target="_blank" rel="noopener">سجل PubChem الرسمي</a></div>` : ''}
+      </div>
+    `;
+
+    loadBiomedicalLiterature(data.name);
+  } catch (err) {
+    console.error('Error loading compound:', err);
+  }
+}
+
+async function loadBiomedicalLiterature(query) {
+  const container = document.getElementById('scienceLitContainer');
+  if (!container) return;
+  container.innerHTML = '<em>جاري البحث عن أحدث الأوراق والمقالات العلمية...</em>';
+
+  try {
+    const res = await fetch(`/api/science/literature?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    const list = data.results || [];
+
+    if (!list.length) {
+      container.innerHTML = '<div style="color:var(--ink-soft); font-size:13px;">لا توجد نتائج بحث مباشرة لهذا المصطلح.</div>';
+      return;
+    }
+
+    container.innerHTML = list.map(item => `
+      <div style="background:var(--canvas); border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+          <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" style="font-weight:600; font-size:13.5px; color:#155FDB; text-decoration:none; display:block; margin-bottom:6px;">
+            ${escapeHtml(item.title)}
+          </a>
+          <div style="font-size:11.5px; color:var(--ink-soft); line-height:1.5;">
+            ${escapeHtml(item.authorString || 'باحثون')}
+          </div>
+        </div>
+        <div style="margin-top:8px; display:flex; justify-content:space-between; font-size:11px; color:var(--ink-soft); border-top:1px solid var(--line); padding-top:6px;">
+          <span>${escapeHtml(item.journalTitle || '')}</span>
+          <span>${escapeHtml(item.pubYear || '')}</span>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = '<div style="color:var(--danger); font-size:13px;">تعذر تحميل الأوراق العلمية.</div>';
+  }
+}
+
+/* =====================================================================
+   AI FLOATING ACTION BUTTON & QUICK MENU
+   ===================================================================== */
+function initAiFab() {
+  const fabBtn = document.getElementById('aiFabBtn');
+  const fabMenu = document.getElementById('aiFabMenu');
+  const fabVoiceBtn = document.getElementById('aiFabVoiceBtn');
+  const voiceModal = document.getElementById('voiceModalOverlay');
+  const voiceCloseBtn = document.getElementById('voiceCloseBtn');
+  const voiceStopBtn = document.getElementById('voiceStopBtn');
+  const voiceInterruptBtn = document.getElementById('voiceInterruptBtn');
+
+  if (fabBtn && fabMenu) {
+    fabBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fabMenu.classList.toggle('active');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#aiFabContainer')) {
+        fabMenu.classList.remove('active');
+      }
+    });
+  }
+
+  function openLiveVoice() {
+    if (fabMenu) fabMenu.classList.remove('active');
+    if (voiceModal) voiceModal.classList.add('active');
+    if (!_liveVoice) {
+      _liveVoice = new LiveVoiceManager();
+    }
+    _liveVoice.start();
+  }
+
+  if (fabVoiceBtn) {
+    fabVoiceBtn.addEventListener('click', () => {
+      openLiveVoice();
+    });
+  }
+
+  if (voiceCloseBtn) {
+    voiceCloseBtn.addEventListener('click', () => {
+      if (_liveVoice) _liveVoice.stop();
+    });
+  }
+
+  if (voiceStopBtn) {
+    voiceStopBtn.addEventListener('click', () => {
+      if (_liveVoice) _liveVoice.stop();
+    });
+  }
+
+  if (voiceInterruptBtn) {
+    voiceInterruptBtn.addEventListener('click', () => {
+      if (_liveVoice) _liveVoice.interrupt();
+    });
+  }
+}
+
+/* =====================================================================
    INIT
    ===================================================================== */
 document.getElementById('footYear').textContent = `© ${new Date().getFullYear()} سرمد`;
@@ -4029,6 +4958,7 @@ renderNavForUser();
 loadFooterAccreditation();
 initCookieConsent();
 initCustomSelects();
+initAiFab();
 // Login is now required to see anything, so the very first render must
 // wait for Firebase to finish restoring a persisted session — otherwise a
 // returning, already-logged-in student would see a flash of the
