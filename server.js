@@ -4,6 +4,7 @@ import http from 'http';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { GoogleGenAI, Modality } from '@google/genai';
+import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -269,6 +270,306 @@ app.post('/api/gemini/quiz-challenge', async (req, res) => {
   } catch (err) {
     console.error('Quiz challenge error:', err);
     res.status(500).json({ error: err.message || 'فشل توليد التحدي البرمجي.' });
+  }
+});
+
+// NEW FEATURE: Daily AI Programming Tip Generator
+app.post('/api/gemini/daily-tip', async (req, res) => {
+  try {
+    const { category = 'all', topic = '' } = req.body;
+    const prompt = `قدم نصيحة برمجية احترافية ومفيدة للمطورين والطلاب في منصة سرمد.
+مجال النصيحة: ${category} ${topic ? `(تركيز إضافي: ${topic})` : ''}
+
+نسق النصيحة كالتالي:
+- **عنوان النصيحة:** (سطر واحد جذاب ومعبر)
+- **المفهوم / المشكلة:** (شرح مبسط ومباشر للمفهوم أو الخطأ الشائع)
+- **الحل العملي وكود توضيحي:** (كود قصير ومباشر باللغة المناسبة مثل JS, TS, Python, SQL)
+- **الأثر والفائدة:** (لماذا هذا مهم في بيئات الإنتاج الحقيقية)
+
+شروط أساسية:
+1. باللغة العربية الفصحى التقنية السليمة.
+2. ممنوع استخدام أي رموز تعبيرية (Emojis) إطلاقاً.`;
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
+      systemInstruction: 'أنت مهندس برمجيات محنك يقدم نصائح تقنية دقيقة وسريعة خالية تماماً من الإيموجيز.'
+    });
+
+    res.json({
+      tip: response.text || '',
+      modelUsed
+    });
+  } catch (err) {
+    console.error('Daily tip error:', err);
+    res.status(500).json({ error: err.message || 'فشل توليد النصيحة البرمجية.' });
+  }
+});
+
+// ============================================================================
+// INTERACTIVE CODING LABS: Python & SQL Code Execution Engine
+// ============================================================================
+app.post('/api/lab/execute', async (req, res) => {
+  try {
+    const { language = 'python', code = '', input = '' } = req.body;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: 'الكود البرمجي مطلوب للتشغيل.' });
+    }
+
+    const startTime = Date.now();
+    const timeoutMs = 6000;
+
+    if (language === 'python') {
+      const runnerCode = `
+import sys, io
+code = sys.stdin.read()
+try:
+    compiled = compile(code, '<sarmad_lab>', 'exec')
+    exec(compiled, {'__name__': '__main__'})
+except Exception as e:
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+`;
+      const proc = spawn('python3', ['-c', runnerCode], {
+        timeout: timeoutMs,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (d) => { if (stdout.length < 50000) stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { if (stderr.length < 50000) stderr += d.toString(); });
+
+      proc.stdin.write(code);
+      proc.stdin.end();
+
+      proc.on('close', (codeStatus) => {
+        const executionTimeMs = Date.now() - startTime;
+        res.json({
+          language: 'python',
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          exitCode: codeStatus,
+          executionTimeMs,
+          success: codeStatus === 0 && !stderr.includes('Traceback')
+        });
+      });
+
+      proc.on('error', (err) => {
+        res.status(500).json({ error: 'فشل تشغيل بيئة بايثون: ' + err.message });
+      });
+
+    } else if (language === 'sql') {
+      // Python SQLite runner with pre-seeded relational database schema
+      const sqlRunnerScript = `
+import sys, json, sqlite3
+
+db = sqlite3.connect(':memory:')
+cur = db.cursor()
+
+# Pre-seed sample tables for educational queries
+cur.executescript('''
+CREATE TABLE students (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE,
+  track TEXT,
+  level TEXT,
+  xp INTEGER DEFAULT 0
+);
+CREATE TABLE courses (
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,
+  category TEXT,
+  hours INTEGER,
+  price REAL
+);
+CREATE TABLE enrollments (
+  id INTEGER PRIMARY KEY,
+  student_id INTEGER,
+  course_id INTEGER,
+  grade REAL,
+  completed_at TEXT,
+  FOREIGN KEY(student_id) REFERENCES students(id),
+  FOREIGN KEY(course_id) REFERENCES courses(id)
+);
+
+INSERT INTO students VALUES
+  (1, 'أسامة محمد', 'osama@sarmad.edu', 'تطوير الويب الشامل', 'متقدم', 1420),
+  (2, 'مريم أحمد', 'maryam@sarmad.edu', 'الذكاء الاصطناعي وبايثون', 'متوسط', 980),
+  (3, 'خالد البربري', 'khaled@sarmad.edu', 'أمن المعلومات والسيبراني', 'متقدم', 1850),
+  (4, 'نورة العتيبي', 'noura@sarmad.edu', 'هندسة البيانات وSQL', 'مبتدئ', 450),
+  (5, 'عمر الفاروق', 'omar@sarmad.edu', 'تطوير الويب الشامل', 'متوسط', 720);
+
+INSERT INTO courses VALUES
+  (101, 'مبادئ لغة جافاسكريبت الحديثة', 'Frontend', 24, 0.0),
+  (102, 'هياكل البيانات والخوارزميات في بايثون', 'Computer Science', 36, 150.0),
+  (103, 'تصميم وإدارة قواعد بيانات PostgreSQL و SQLite', 'Backend', 30, 120.0),
+  (104, 'الذكاء الاصطناعي التوليدي ونماذج اللغة', 'AI & ML', 40, 200.0);
+
+INSERT INTO enrollments VALUES
+  (1, 1, 101, 98.5, '2026-02-15'),
+  (2, 1, 103, 94.0, '2026-03-01'),
+  (3, 2, 102, 91.0, '2026-02-28'),
+  (4, 2, 104, 96.0, '2026-03-10'),
+  (5, 3, 101, 89.0, '2026-01-20'),
+  (6, 3, 103, 99.0, '2026-02-10'),
+  (7, 4, 103, 85.0, '2026-03-12'),
+  (8, 5, 101, 92.5, '2026-03-05');
+''')
+db.commit()
+
+query = sys.stdin.read().strip()
+
+try:
+    statements = [s.strip() for s in query.split(';') if s.strip()]
+    columns = []
+    rows = []
+    affected_rows = 0
+
+    for st in statements:
+        cur.execute(st)
+        if cur.description:
+            columns = [col[0] for col in cur.description]
+            rows = [list(r) for r in cur.fetchall()]
+        else:
+            affected_rows += cur.rowcount
+
+    db.commit()
+
+    print(json.dumps({
+        "success": True,
+        "columns": columns,
+        "rows": rows,
+        "rowCount": len(rows),
+        "affectedRows": affected_rows,
+        "message": f"تم استرجاع {len(rows)} صفوف بنجاح" if columns else f"تم تنفيذ الاستعلام بنجاح (تأثر {affected_rows} صفوف)"
+    }, ensure_ascii=False))
+except Exception as e:
+    print(json.dumps({
+        "success": False,
+        "error": str(e)
+    }, ensure_ascii=False))
+`;
+
+      const proc = spawn('python3', ['-c', sqlRunnerScript], {
+        timeout: timeoutMs,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      proc.stdin.write(code);
+      proc.stdin.end();
+
+      proc.on('close', (exitCode) => {
+        const executionTimeMs = Date.now() - startTime;
+        if (stderr && !stdout) {
+          return res.status(400).json({ error: stderr.trim(), executionTimeMs });
+        }
+        try {
+          const parsed = JSON.parse(stdout);
+          parsed.executionTimeMs = executionTimeMs;
+          res.json(parsed);
+        } catch (e) {
+          res.status(500).json({ error: 'فشل معالجة مخرجات الاستعلام: ' + stdout, executionTimeMs });
+        }
+      });
+
+      proc.on('error', (err) => {
+        res.status(500).json({ error: 'فشل تشغيل محرك SQL: ' + err.message });
+      });
+
+    } else {
+      res.status(400).json({ error: 'لغة البرمجة غير مدعومة في بيئة الخادم. استخدم معمل الويب لتشغيل JavaScript محلياً.' });
+    }
+  } catch (err) {
+    console.error('Lab execute error:', err);
+    res.status(500).json({ error: err.message || 'فشل تشغيل الكود في المعمل البرمجي.' });
+  }
+});
+
+// NEW FEATURE: Lab AI Assistant (Explain, Debug, Optimize, Test Cases, Challenges)
+app.post('/api/gemini/lab-assist', async (req, res) => {
+  try {
+    const { action = 'explain', language = 'javascript', code = '', query = '' } = req.body;
+    if (!code && action !== 'challenge') {
+      return res.status(400).json({ error: 'الكود البرمجي مطلوب للمساعد الذكي.' });
+    }
+
+    let prompt = '';
+    if (action === 'debug') {
+      prompt = `أنت مهندس فحص وتصحيح أكواد خبير في منصة سرمد.
+افحص الكود التالي المكتوب بلغة (${language}):
+\`\`\`${language}
+${code}
+\`\`\`
+1. **تحديد الأخطاء:** هل توجد أخطاء في الصياغة (Syntax)، أو أخطاء منطقية (Logic)، أو أخطاء وقت التشغيل (Runtime)؟
+2. **الكود المصحح بالكامل:** قدم النسخة المصححة والمضمونة للعمل.
+3. **توضيح أسباب التصحيح:** شرح علمي لما تم تعديله ولماذا.
+ملاحظة صارمة: لا تستخدم أي رموز تعبيرية (Emojis) نهائياً.`;
+    } else if (action === 'optimize') {
+      prompt = `أنت خبير كفاءة برمجية وهياكل بيانات في منصة سرمد.
+قم بتحسين أداء وجودة الكود التالي المكتوب بلغة (${language}):
+\`\`\`${language}
+${code}
+\`\`\`
+1. **تحليل التعقيد الزمني والمكاني الحالي:** Big-O notation.
+2. **الكود بعد التحسين والتنظيف:** تطبيق معايير Clean Code وكفاءة التنفيذ.
+3. **المقارنة والفوائد:** ما الذي تحسن وما هو الفرق في الأداء.
+ملاحظة صارمة: لا تستخدم أي رموز تعبيرية (Emojis) نهائياً.`;
+    } else if (action === 'test') {
+      prompt = `أنت مهندس اختبار جودة البرمجيات (QA & Test Automation) في منصة سرمد.
+قم بإنشاء مجموعة اختبارات شاملة (Unit Test Cases) للكود التالي (${language}):
+\`\`\`${language}
+${code}
+\`\`\`
+1. **حالات الاختبار الأساسية (Happy Path):** المدخلات والمخرجات المتوقعة.
+2. **الحالات الحدية والشاذة (Edge Cases):** مثل القيم الفارغة، الأرقام السالبة، المصفوفات الفارغة.
+3. **كود الاختبارات التنفيذية:** جاهز للتشغيل والتحقق.
+ملاحظة صارمة: لا تستخدم أي رموز تعبيرية (Emojis) نهائياً.`;
+    } else if (action === 'challenge') {
+      prompt = `اقترح تحدياً برمجياً تفاعلياً جديداً ومثيراً للاهتمام بلغة (${language}) يناسب المعامل البرمجية في منصة سرمد.
+${query ? `تركيز إضافي: ${query}` : ''}
+نسق التحدي كالتالي:
+- **عنوان التحدي**
+- **وصف المشكلة والمتطلبات**
+- **قالب الكود المبدئي (Starter Code)**
+- **حالات الاختبار للتحقق (Test Cases)**
+- **تلميح برمجي ذكي**
+ملاحظة صارمة: لا تستخدم أي رموز تعبيرية (Emojis) نهائياً.`;
+    } else {
+      // explain
+      prompt = `أنت معلم ومهندس برمجيات محترف في منصة سرمد.
+اشرح الكود التالي المكتوب بلغة (${language}) شرحاً معمارياً مبسطاً وشاملاً:
+\`\`\`${language}
+${code}
+\`\`\`
+${query ? `سؤال إضافي: ${query}` : ''}
+1. **الفكرة والوظيفة العامة للكود**
+2. **تتبع التدفق خطوة بخطوة (Step-by-step Flow)**
+3. **المفاهيم البرمجية المطبقة وأفضل الممارسات**
+ملاحظة صارمة: لا تستخدم أي رموز تعبيرية (Emojis) نهائياً.`;
+    }
+
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+    const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
+      systemInstruction: 'أنت مهندس ومصحح أكواد تعليمي في منصة سرمد، تقدم إجابات احترافية دقيقة خالية تماماً من الإيموجيز.'
+    });
+
+    res.json({
+      output: response.text || '',
+      action,
+      language,
+      modelUsed
+    });
+  } catch (err) {
+    console.error('Lab assist error:', err);
+    res.status(500).json({ error: err.message || 'فشل مساعد المعمل البرمجي.' });
   }
 });
 

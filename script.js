@@ -967,7 +967,7 @@ async function router(){
   // allowed. The one exception is the public certificate-verification page
   // — that's meant to be checkable by anyone (an employer, for instance)
   // who isn't a registered student at all.
-  if (!session.user && !['certificate', 'ai-chat', 'science-lab', 'home', 'tracks', 'leaderboard', 'articles'].includes(name)) {
+  if (!session.user && !['certificate', 'ai-chat', 'science-lab', 'home', 'tracks', 'leaderboard', 'articles', 'code-lab', 'coding-lab', 'lab'].includes(name)) {
     renderLoginRequired();
     doneTopLoader();
     return;
@@ -984,6 +984,7 @@ async function router(){
     else if (name==='tracks') await renderAllTracks();
     else if (name==='ai-chat') await renderAiChat();
     else if (name==='science-lab') await renderScienceLab();
+    else if (name==='code-lab' || name==='coding-lab' || name==='lab') await renderCodeLab(param);
     else if (name==='courses') await renderAllCourses();
     else if (name==='track') await renderTrack(param);
     else if (name==='course') await renderCourse(param);
@@ -5033,19 +5034,37 @@ function initTwoFactorModal() {
 /* =====================================================================
    AI QUICK ASSISTANT DRAWER & FAB TRIGGER
    ===================================================================== */
+function openAiDrawer() {
+  const drawerOverlay = document.getElementById('aiDrawerOverlay');
+  if (drawerOverlay) {
+    drawerOverlay.classList.add('active');
+    const input = document.getElementById('aiDrawerInput');
+    if (input) setTimeout(() => input.focus(), 100);
+  } else {
+    navigate('ai-chat');
+  }
+}
+window.openAiDrawer = openAiDrawer;
+
 function initAiFab() {
   const fabBtn = document.getElementById('aiFabBtn');
   const drawerOverlay = document.getElementById('aiDrawerOverlay');
   const drawerClose = document.getElementById('aiDrawerClose');
   const expandLink = document.getElementById('aiExpandLink');
+  const navAiBtn = document.getElementById('navAiBtn');
+
+  if (navAiBtn) {
+    navAiBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openAiDrawer();
+    });
+  }
 
   if (fabBtn && drawerOverlay) {
     fabBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      drawerOverlay.classList.add('active');
-      const input = document.getElementById('aiDrawerInput');
-      if (input) setTimeout(() => input.focus(), 100);
+      openAiDrawer();
     });
 
     if (drawerClose) {
@@ -5301,6 +5320,2196 @@ function initAiFab() {
 }
 
 /* =====================================================================
+   DAILY PROGRAMMING TIPS & USER PREFERENCES
+   ===================================================================== */
+const PROGRAMMING_TIPS_LIBRARY = [
+  // Frontend
+  {
+    id: 'fe-1',
+    category: 'frontend',
+    categoryName: 'تطوير الويب والواجهات',
+    level: 'أداء عالي',
+    title: 'تحسين أداء حقول البحث الفوري بالـ Debouncing',
+    content: 'عند بناء حقل بحث فوري، تجنب إرسال طلب شبكي مع كل حرف يكتبه المستخدم. استخدم دالة تقليص (Debounce) لانتظار توقف المستخدم عن الكتابة لمدة 300 ملي ثانية قبل إرسال الطلب. يقلل هذا الضغط على الخادم بنسبة 80% ويمنع مشاكل تسابق البيانات.',
+    code: `function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}`
+  },
+  {
+    id: 'fe-2',
+    category: 'frontend',
+    categoryName: 'تطوير الويب والواجهات',
+    level: 'تصميم متجاوب',
+    title: 'استخدام CSS Clamp للخطوط والأبعاد المتجاوبة بسلاسة',
+    content: 'بدلاً من كتابة عشرات استعلامات الوسائط (Media Queries) لأحجام النصوص، استخدم دالة clamp(min, preferred, max). تجعل النص يتدرج بسلاسة تامة مع حجم الشاشة دون قفزات مفاجئة.',
+    code: `/* يتراوح حجم الخط بين 16px كحد أدنى و 32px كحد أقصى */
+font-size: clamp(1rem, 2.5vw + 0.5rem, 2rem);`
+  },
+  {
+    id: 'fe-3',
+    category: 'frontend',
+    categoryName: 'تطوير الويب والواجهات',
+    level: 'إمكانية الوصول و SEO',
+    title: 'تفضيل Semantic HTML على وسوم div العشوائية',
+    content: 'استخدم وسوم HTML5 الدلالية مثل <main>, <article>, <section>, <nav>, <aside>. يساعد ذلك قارئات الشاشة ومحركات البحث ويسهل فهم بنية الصفحة وصيانتها من قبل فريق العمل.'
+  },
+  {
+    id: 'fe-4',
+    category: 'frontend',
+    categoryName: 'تطوير الويب والواجهات',
+    level: 'سرعة التحميل',
+    title: 'استخدام خاصية loading="lazy" وتحديد أبعاد الصور',
+    content: 'أضف loading="lazy" للصور الواقعة خارج الشاشة الأولى (Below the fold) وحدد دائماً width و height لمنع ظاهرة Cumulative Layout Shift (CLS) وتحسين مؤشرات تجربة المستخدم.'
+  },
+
+  // Backend
+  {
+    id: 'be-1',
+    category: 'backend',
+    categoryName: 'الخوادم وقواعد البيانات',
+    level: 'أمان وحماية',
+    title: 'استخدام الاستعلامات ذات المعاملات (Parameterized Queries) لمنع حقن SQL',
+    content: 'لا تدمج مدخلات المستخدم مباشرة داخل سلاسل SQL عبر جمع النصوص. استخدم Prepared Statements و Parameterized Queries دائماً حتى يعامل المحرك المدخلات كبيانات صرفة وليس كأوامر قابلة للتنفيذ.',
+    code: `// استعلام آمن تماماً ضد SQL Injection
+const result = await db.query(
+  'SELECT id, name FROM users WHERE email = $1',
+  [userEmail]
+);`
+  },
+  {
+    id: 'be-2',
+    category: 'backend',
+    categoryName: 'الخوادم وقواعد البيانات',
+    level: 'حماية وتوافرية',
+    title: 'تطبيق التحديد التدريجي للمعدل (Rate Limiting) على مسارات الـ API',
+    content: 'احمِ خوادمك من هجمات التخمين والحرمان من الخدمة (Brute Force / DoS) بفرض حد أقصى للطلبات المسموحة لكل عنوان IP أو مستخدم خلال فترة زمنية محددة، خاصة في مسارات تسجيل الدخول والدفع.'
+  },
+  {
+    id: 'be-3',
+    category: 'backend',
+    categoryName: 'الخوادم وقواعد البيانات',
+    level: 'كفاءة الاستعلامات',
+    title: 'فهرسة أعمدة البحث المتكررة (Database Indexing)',
+    content: 'أضف فهارس (Indexes) على الأعمدة المستخدمة بكثرة في شروط WHERE و JOIN و ORDER BY. يحول هذا عملية البحث من فحص كامل للجدول O(N) إلى بحث ثنائي شجري O(log N).',
+    code: `CREATE INDEX idx_orders_customer_date ON orders(customer_id, created_at DESC);`
+  },
+  {
+    id: 'be-4',
+    category: 'backend',
+    categoryName: 'الخوادم وقواعد البيانات',
+    level: 'تشفير وحماية',
+    title: 'تخزين الكلمات السرية بخوارزميات تجزئة بطيئة مع Salt',
+    content: 'لا تستخدم خوارزميات التجزئة السريعة مثل MD5 أو SHA256 لحفظ كلمات السر لأنها عرضة لكسر Rainbow Tables. اعتمد دائماً على خوارزميات مثل bcrypt أو Argon2 مع Salt عشوائي لكل مستخدم.'
+  },
+
+  // Clean Code
+  {
+    id: 'cc-1',
+    category: 'cleancode',
+    categoryName: 'الكود النظيف وهندسة البرمجيات',
+    level: 'مبدأ معزز',
+    title: 'نمط الخروج المبكر (Early Return Pattern) لتقليل التعشيش',
+    content: 'بدلاً من كتل if/else المتداخلة والعميقة، تحقق من الحالات الخاصة وغير الصالحة أولاً واخرج فوراً باستخدام return. هذا يجعل المسار الرئيسي واضحاً وخالياً من الإزاحات المربكة.',
+    code: `function processPayment(order) {
+  if (!order) return { error: 'الطلب غير موجود' };
+  if (order.isPaid) return { error: 'الطلب مدفوع مسبقاً' };
+  if (!order.items.length) return { error: 'السلة فارغة' };
+
+  // المسار الرئيسي المباشر
+  return executeGatewayCharge(order);
+}`
+  },
+  {
+    id: 'cc-2',
+    category: 'cleancode',
+    categoryName: 'الكود النظيف وهندسة البرمجيات',
+    level: 'مبدأ SOLID',
+    title: 'مبدأ المسؤولية الواحدة (Single Responsibility Principle)',
+    content: 'يجب أن يكون لكل دالة أو فئة هدف ومسؤولية واحدة فقط وسبب واحد للتغيير. إذا كانت دالتك تجلب بيانات المستخدم، ثم تعالج حسابه، ثم ترسل بريداً إلكترونياً، قسّمها إلى ثلاث دوال منفصلة.'
+  },
+  {
+    id: 'cc-3',
+    category: 'cleancode',
+    categoryName: 'الكود النظيف وهندسة البرمجيات',
+    level: 'وضوح وتوثيق',
+    title: 'التعليقات تشرح "السبب" (Why) وليس "الماذا" (What)',
+    content: 'الكود النظيف يشرح ماذا يفعل بنفسه عبر أسماء المتغيرات والدوال الواضحة. استخدم التعليقات فقط لتوضيح القرارات غير البديهية، مثل سبب اختيار خوارزمية معينة أو التعامل مع خلل خاص في متصفح قديم.'
+  },
+  {
+    id: 'cc-4',
+    category: 'cleancode',
+    categoryName: 'الكود النظيف وهندسة البرمجيات',
+    level: 'صيانة البرمجيات',
+    title: 'استبدال الأرقام السحرية بثوابت معبرة (Named Constants)',
+    content: 'تجنب وضع أرقام أو نصوص مبهمة في كودك. استبدل if (status === 4) بثابت معبر مثل const STATUS_REFUNDED = 4; لتسهيل قراءة الكود ومنع الأخطاء غير المقصودة.'
+  },
+
+  // Algorithms
+  {
+    id: 'algo-1',
+    category: 'algorithms',
+    categoryName: 'الخوارزميات وحل المشكلات',
+    level: 'هياكل بيانات',
+    title: 'استخدام مجموعات الهاش (Hash Sets / Maps) للتحقق بزمن O(1)',
+    content: 'البحث عن عنصر داخل مصفوفة عادية يكلف O(N)، فإذا كان داخل حلقة تكرارية يصبح التعقيد O(N²). تحويل البيانات إلى Set أو Map يقلل وقت التحقق من الوجود إلى زمن ثابت O(1).',
+    code: `// فحص التكرار بزمن خطي O(n) بدلاً من O(n^2)
+function hasDuplicates(arr) {
+  const seen = new Set();
+  for (const item of arr) {
+    if (seen.has(item)) return true;
+    seen.add(item);
+  }
+  return false;
+}`
+  },
+  {
+    id: 'algo-2',
+    category: 'algorithms',
+    categoryName: 'الخوارزميات وحل المشكلات',
+    level: 'أنماط حل المسائل',
+    title: 'نمط المؤشرين (Two Pointers) للمصفوفات المرتبة',
+    content: 'عند البحث عن أزواج من العناصر في مصفوفة مرتبة، ضع مؤشراً في أولها ومؤشراً في آخرها وحرك أحدهما بناءً على ناتج المقارنة. هذا يحل المسألة بمرور واحد O(N) دون استهلاك ذاكرة إضافية.'
+  },
+  {
+    id: 'algo-3',
+    category: 'algorithms',
+    categoryName: 'الخوارزميات وحل المشكلات',
+    level: 'تحليل الكفاءة',
+    title: 'التوازن بين تعقيد الوقت والمساحة (Time vs Space Trade-off)',
+    content: 'في كثير من الأحيان يمكنك تسريع الخوارزمية بشكل كبير عبر التضحية بقدر قليل من الذاكرة (Caching / Memoization). فهم هذه المقايضة هو جوهر هندسة النظم السريعة.'
+  },
+
+  // DevOps & Tools
+  {
+    id: 'devops-1',
+    category: 'devops',
+    categoryName: 'أدوات وبيئة العمل',
+    level: 'إدارة النسخ',
+    title: 'اعتماد معيار Conventional Commits لرسائل Git واضحة',
+    content: 'اجعل رسائل commit مفيدة وموحدة باستخدام بادئات واضحة: feat للميزات الجديدة، fix لإصلاح الأخطاء، refactor لإعادة هيكلة الكود، docs للتوثيق، مع وصف موجز بصيغة الأمر المباشر.',
+    code: `feat(auth): add two-factor authentication via email code
+fix(payment): prevent duplicate submission on slow network`
+  },
+  {
+    id: 'devops-2',
+    category: 'devops',
+    categoryName: 'أدوات وبيئة العمل',
+    level: 'أمان بيئة العمل',
+    title: 'عزل أسرار التطبيق في ملفات .env وعدم رفعها إلى Git',
+    content: 'لا تضع مفاتيح API أو كلمات سر قواعد البيانات في ملفات المشروع. ضعها في ملف .env وأضفه فوراً إلى .gitignore، ووفر دائماً ملف .env.example كقالب توضيحي خاوٍ من الأسرار.'
+  },
+  {
+    id: 'devops-3',
+    category: 'devops',
+    categoryName: 'أدوات وبيئة العمل',
+    level: 'أتمتة الجودة',
+    title: 'تفعيل الـ Linters ومحددات التنسيق التلقائية في محرر الكود',
+    content: 'استخدم أدوات مثل ESLint و Prettier مع خطافات ما قبل الالتزام (Pre-commit hooks). تكتشف هذه الأدوات الأخطاء الشائعة وتوحد أسلوب كتابة الفريق تلقائياً قبل وصول الكود للمستودع.'
+  },
+
+  // Career
+  {
+    id: 'career-1',
+    category: 'career',
+    categoryName: 'مهارات المطور والتوجيه المهني',
+    level: 'تطوير ذاتي',
+    title: 'الخروج من فخ الدروس (Tutorial Hell) عبر بناء مشاريع حقيقية',
+    content: 'مشاهدة الدورات تمنحك شعوراً زائفاً بالإتقان. التعلم الحقيقي يبدأ عندما تغلق شاشة الدرس وتبدأ في بناء مشروع بنفسك من الصفر وتواجه الأخطاء وتبحث عن حلولها في التوثيق الرسمي.'
+  },
+  {
+    id: 'career-2',
+    category: 'career',
+    categoryName: 'مهارات المطور والتوجيه المهني',
+    level: 'منهجية الفهم',
+    title: 'استخدام تقنية فاينمان لشرح المفاهيم المعقدة ببساطة',
+    content: 'لتتأكد من فهمك لمفهوم برمجي دقيق مثل Closures أو Promises أو Event Loop، جرب شرحه بكلمات عربية بسيطة دون مصطلحات مبهمة. إذا عجزت عن التبسيط، فذلك يعني وجود فجوة في فهمك تحتاج للمراجعة.'
+  },
+  {
+    id: 'career-3',
+    category: 'career',
+    categoryName: 'مهارات المطور والتوجيه المهني',
+    level: 'عمل جماعي',
+    title: 'مراجعة الكود (Code Review) كأداة للتعلم المتبادل وليس للتصيد',
+    content: 'عند مراجعة كود زملائك، ركز على التعلم وتقديم اقتراحات بناءة ومبررة بالأسباب المعمارية بدلاً من الانتقاد الشخصي. وعندما يراجعون كودك، اعتبر ملاحظاتهم فرصة ذهبية لصقل مهاراتك.'
+  }
+];
+
+let _currentDisplayedTip = null;
+let _currentTipCategory = 'all';
+
+function getTipPreferences() {
+  try {
+    const raw = localStorage.getItem('sarmad_tip_prefs');
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (_) {}
+  return {
+    category: 'all',
+    autoShow: true,
+    lastSeenDate: null,
+    savedTips: []
+  };
+}
+
+function saveTipPreferences(prefs) {
+  try {
+    localStorage.setItem('sarmad_tip_prefs', JSON.stringify(prefs));
+  } catch (_) {}
+}
+
+function renderTipContent(tip) {
+  _currentDisplayedTip = tip;
+  const titleEl = document.getElementById('dailyTipTitle');
+  const bodyEl = document.getElementById('dailyTipBody');
+  const catTagEl = document.getElementById('dailyTipCategoryTag');
+  const levelTagEl = document.getElementById('dailyTipLevelTag');
+  const dateBadgeEl = document.getElementById('dailyTipDate');
+  const bookmarkBtn = document.getElementById('dailyTipBookmarkBtn');
+
+  if (titleEl) titleEl.textContent = tip.title || 'نصيحة برمجية';
+  if (catTagEl) catTagEl.textContent = tip.categoryName || 'برمجة';
+  if (levelTagEl) levelTagEl.textContent = tip.level || 'ممارسة موصى بها';
+
+  const todayStr = new Date().toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' });
+  if (dateBadgeEl) dateBadgeEl.textContent = `نصيحة ${todayStr}`;
+
+  if (bodyEl) {
+    let html = `<p>${escapeHtml(tip.content || '')}</p>`;
+    if (tip.code) {
+      html += `<pre><code>${escapeHtml(tip.code)}</code></pre>`;
+    }
+    bodyEl.innerHTML = html;
+  }
+
+  // Update bookmark icon status
+  if (bookmarkBtn) {
+    const prefs = getTipPreferences();
+    const isSaved = (prefs.savedTips || []).some(id => id === tip.id || id === tip.title);
+    bookmarkBtn.style.color = isSaved ? 'var(--gold)' : 'var(--ink-soft)';
+  }
+}
+
+function getRandomTip(category = 'all') {
+  let pool = PROGRAMMING_TIPS_LIBRARY;
+  if (category && category !== 'all') {
+    pool = pool.filter(t => t.category === category);
+  }
+  if (!pool.length) pool = PROGRAMMING_TIPS_LIBRARY;
+  // Pick random tip, preferably different from current
+  if (pool.length > 1 && _currentDisplayedTip) {
+    const filtered = pool.filter(t => t.id !== _currentDisplayedTip.id && t.title !== _currentDisplayedTip.title);
+    if (filtered.length) pool = filtered;
+  }
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx];
+}
+
+function openDailyTipModal(categoryOverride) {
+  const overlay = document.getElementById('dailyTipOverlay');
+  if (!overlay) return;
+
+  const prefs = getTipPreferences();
+  const cat = categoryOverride || prefs.category || 'all';
+  _currentTipCategory = cat;
+
+  // Sync category chips
+  const catChips = document.querySelectorAll('.tip-cat-chip');
+  catChips.forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.cat === cat);
+  });
+
+  // Sync prefs controls
+  const autoCheck = document.getElementById('dailyTipAutoShowCheck');
+  const catSelect = document.getElementById('dailyTipPrefCategorySelect');
+  if (autoCheck) autoCheck.checked = prefs.autoShow !== false;
+  if (catSelect) catSelect.value = prefs.category || 'all';
+
+  const tip = getRandomTip(cat);
+  renderTipContent(tip);
+
+  overlay.classList.add('active');
+}
+window.openDailyTipModal = openDailyTipModal;
+
+function initDailyTips() {
+  const overlay = document.getElementById('dailyTipOverlay');
+  const closeBtn = document.getElementById('dailyTipClose');
+  const nextBtn = document.getElementById('dailyTipNextBtn');
+  const aiGenBtn = document.getElementById('dailyTipAiGenBtn');
+  const copyBtn = document.getElementById('dailyTipCopyBtn');
+  const bookmarkBtn = document.getElementById('dailyTipBookmarkBtn');
+  const prefsToggle = document.getElementById('dailyTipPrefsToggle');
+  const prefsBody = document.getElementById('dailyTipPrefsBody');
+  const savePrefsBtn = document.getElementById('dailyTipSavePrefsBtn');
+  const navTipBtn = document.getElementById('navDailyTipBtn');
+  const mobileTipLink = document.getElementById('mobileDailyTipLink');
+
+  if (navTipBtn) {
+    navTipBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openDailyTipModal();
+    });
+  }
+
+  if (mobileTipLink) {
+    mobileTipLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const mobileMenu = document.getElementById('mobileMenu');
+      if (mobileMenu) mobileMenu.classList.remove('open');
+      openDailyTipModal();
+    });
+  }
+
+  if (overlay) {
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        overlay.classList.remove('active');
+      });
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove('active');
+      }
+    });
+
+    // Category chips click
+    const catChips = document.querySelectorAll('.tip-cat-chip');
+    catChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        catChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        _currentTipCategory = chip.dataset.cat || 'all';
+        const tip = getRandomTip(_currentTipCategory);
+        renderTipContent(tip);
+      });
+    });
+
+    // Next tip button
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const tip = getRandomTip(_currentTipCategory);
+        renderTipContent(tip);
+      });
+    }
+
+    // AI Tip Generation button
+    if (aiGenBtn) {
+      aiGenBtn.addEventListener('click', async () => {
+        aiGenBtn.disabled = true;
+        const origText = aiGenBtn.innerHTML;
+        aiGenBtn.innerHTML = `<span>جارٍ توليد نصيحة ذكية...</span>`;
+
+        const bodyEl = document.getElementById('dailyTipBody');
+        const titleEl = document.getElementById('dailyTipTitle');
+        if (bodyEl) {
+          bodyEl.innerHTML = `<div style="text-align:center; padding:16px; color:var(--ink-soft);">جارٍ استدعاء نموذج Gemini لتوليد نصيحة برمجية احترافية في مجال (${_currentTipCategory})...</div>`;
+        }
+
+        try {
+          const res = await fetch('/api/gemini/daily-tip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ category: _currentTipCategory })
+          });
+          const data = await res.json();
+          if (data.error) {
+            if (bodyEl) bodyEl.innerHTML = `<div style="color:var(--danger);">${escapeHtml(data.error)}</div>`;
+          } else {
+            const rawTip = data.tip || '';
+            let parsedHtml = escapeHtml(rawTip);
+            if (typeof marked !== 'undefined') {
+              try { parsedHtml = marked.parse(rawTip); } catch (_) {}
+            }
+            if (titleEl) titleEl.textContent = 'نصيحة برمجية بالذكاء الاصطناعي';
+            if (bodyEl) bodyEl.innerHTML = parsedHtml;
+
+            // Also register into session tip library
+            const dynamicTip = {
+              id: 'ai-gen-' + Date.now(),
+              category: _currentTipCategory,
+              categoryName: 'نصيحة ذكية (Gemini)',
+              level: 'ممارسة متقدمة',
+              title: 'نصيحة برمجية بالذكاء الاصطناعي',
+              content: rawTip
+            };
+            _currentDisplayedTip = dynamicTip;
+          }
+        } catch (err) {
+          if (bodyEl) bodyEl.innerHTML = `<div style="color:var(--danger);">تعذر توليد النصيحة: ${escapeHtml(err.message)}</div>`;
+        } finally {
+          aiGenBtn.disabled = false;
+          aiGenBtn.innerHTML = origText;
+        }
+      });
+    }
+
+    // Copy tip button
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        if (!_currentDisplayedTip) return;
+        const textToCopy = `${_currentDisplayedTip.title}\n\n${_currentDisplayedTip.content}${_currentDisplayedTip.code ? `\n\n${_currentDisplayedTip.code}` : ''}\n\n— منصة سرمد لتعليم البرمجة`;
+        copyText(textToCopy);
+      });
+    }
+
+    // Bookmark tip button
+    if (bookmarkBtn) {
+      bookmarkBtn.addEventListener('click', () => {
+        if (!_currentDisplayedTip) return;
+        const prefs = getTipPreferences();
+        if (!prefs.savedTips) prefs.savedTips = [];
+        const tipIdentifier = _currentDisplayedTip.id || _currentDisplayedTip.title;
+        const idx = prefs.savedTips.indexOf(tipIdentifier);
+        if (idx === -1) {
+          prefs.savedTips.push(tipIdentifier);
+          bookmarkBtn.style.color = 'var(--gold)';
+          toast('تم حفظ النصيحة في مفضلتك');
+        } else {
+          prefs.savedTips.splice(idx, 1);
+          bookmarkBtn.style.color = 'var(--ink-soft)';
+          toast('تمت إزالة النصيحة من المفضلة');
+        }
+        saveTipPreferences(prefs);
+      });
+    }
+
+    // Preferences toggle
+    if (prefsToggle && prefsBody) {
+      prefsToggle.addEventListener('click', () => {
+        const isHidden = prefsBody.style.display === 'none';
+        prefsBody.style.display = isHidden ? 'block' : 'none';
+      });
+    }
+
+    // Save preferences button
+    if (savePrefsBtn) {
+      savePrefsBtn.addEventListener('click', () => {
+        const autoCheck = document.getElementById('dailyTipAutoShowCheck');
+        const catSelect = document.getElementById('dailyTipPrefCategorySelect');
+        const notice = document.getElementById('dailyTipPrefsSavedNotice');
+
+        const prefs = getTipPreferences();
+        prefs.autoShow = autoCheck ? autoCheck.checked : true;
+        prefs.category = catSelect ? catSelect.value : 'all';
+
+        saveTipPreferences(prefs);
+        _currentTipCategory = prefs.category;
+
+        if (notice) {
+          notice.style.display = 'inline';
+          setTimeout(() => { notice.style.display = 'none'; }, 2500);
+        }
+        toast('تم حفظ تفضيلات النصائح البرمجية بنجاح');
+      });
+    }
+  }
+
+  // Check and show daily tip on platform startup based on user preferences
+  const prefs = getTipPreferences();
+  const today = new Date().toISOString().slice(0, 10);
+  if (prefs.autoShow !== false && prefs.lastSeenDate !== today) {
+    setTimeout(() => {
+      // Show daily tip modal
+      openDailyTipModal(prefs.category || 'all');
+      prefs.lastSeenDate = today;
+      saveTipPreferences(prefs);
+    }, 1200);
+  }
+}
+
+/* =====================================================================
+   GLOBAL KEYBOARD SHORTCUTS SYSTEM (اختصارات لوحة المفاتيح العالمية)
+   ===================================================================== */
+let _keyboardShortcutsEnabled = true;
+
+function initKeyboardShortcuts() {
+  // Bind Header & Mobile triggers
+  const codeLabBtn = document.getElementById('navCodeLabBtn');
+  if (codeLabBtn) codeLabBtn.addEventListener('click', () => navigate('code-lab'));
+
+  const searchPaletteBtn = document.getElementById('navSearchPaletteBtn');
+  if (searchPaletteBtn) searchPaletteBtn.addEventListener('click', openCommandPalette);
+
+  const shortcutsBtn = document.getElementById('navShortcutsBtn');
+  if (shortcutsBtn) shortcutsBtn.addEventListener('click', openShortcutsGuide);
+
+  const mobileShortcutsLink = document.getElementById('mobileShortcutsLink');
+  if (mobileShortcutsLink) mobileShortcutsLink.addEventListener('click', openShortcutsGuide);
+
+  // Global Keydown Listener
+  window.addEventListener('keydown', (e) => {
+    if (!_keyboardShortcutsEnabled) return;
+
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    const isEditing = (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable));
+
+    // 1. ESCAPE: Closes active overlays/drawers
+    if (e.key === 'Escape') {
+      const palette = document.getElementById('commandPaletteOverlay');
+      if (palette && palette.classList.contains('active')) {
+        closeCommandPalette();
+        e.preventDefault();
+        return;
+      }
+      const shortcutsModal = document.getElementById('shortcutsGuideOverlay');
+      if (shortcutsModal && shortcutsModal.classList.contains('active')) {
+        closeShortcutsGuide();
+        e.preventDefault();
+        return;
+      }
+      const tipOverlay = document.getElementById('dailyTipOverlay');
+      if (tipOverlay && tipOverlay.classList.contains('active')) {
+        closeDailyTipModal();
+        e.preventDefault();
+        return;
+      }
+      const drawer = document.getElementById('aiDrawerOverlay');
+      if (drawer && drawer.classList.contains('active')) {
+        closeAiDrawer();
+        e.preventDefault();
+        return;
+      }
+      const mobileMenu = document.getElementById('mobileMenu');
+      if (mobileMenu && mobileMenu.classList.contains('open')) {
+        mobileMenu.classList.remove('open');
+        e.preventDefault();
+        return;
+      }
+      return;
+    }
+
+    // 2. CMD/CTRL + K: Universal Command Palette & Search
+    if (cmdOrCtrl && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      openCommandPalette();
+      return;
+    }
+
+    // 3. CMD/CTRL + SHIFT + A: Open Sarmad AI Assistant Drawer
+    if (cmdOrCtrl && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      openAiDrawer();
+      return;
+    }
+
+    // 4. CMD/CTRL + SHIFT + L: Open Interactive Coding Labs
+    if (cmdOrCtrl && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+      e.preventDefault();
+      navigate('code-lab');
+      return;
+    }
+
+    // 5. CMD/CTRL + SHIFT + T: Open Daily Tech Tip Modal
+    if (cmdOrCtrl && e.shiftKey && (e.key === 't' || e.key === 'T')) {
+      e.preventDefault();
+      openDailyTipModal();
+      return;
+    }
+
+    // 6. CMD/CTRL + / or ? (when not typing in an input): Show Shortcuts Guide
+    if ((cmdOrCtrl && (e.key === '/' || e.key === '?')) || (!isEditing && e.key === '?')) {
+      e.preventDefault();
+      openShortcutsGuide();
+      return;
+    }
+
+    // 7. ALT + 1..6: Direct Section Navigation
+    if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === '1') { e.preventDefault(); navigate(''); return; }
+      if (e.key === '2') { e.preventDefault(); navigate('tracks'); return; }
+      if (e.key === '3') { e.preventDefault(); navigate('code-lab'); return; }
+      if (e.key === '4') { e.preventDefault(); navigate('dashboard'); return; }
+      if (e.key === '5') { e.preventDefault(); navigate('leaderboard'); return; }
+      if (e.key === '6') { e.preventDefault(); navigate('articles'); return; }
+    }
+
+    // 8. CODING LAB CONTEXTUAL SHORTCUTS (Only when in #/code-lab)
+    const codeLabWorkspace = document.getElementById('codeLabWorkspace');
+    if (codeLabWorkspace) {
+      // Ctrl + Enter: Run code
+      if (cmdOrCtrl && e.key === 'Enter') {
+        e.preventDefault();
+        const runBtn = document.getElementById('codeLabRunBtn');
+        if (runBtn) runBtn.click();
+        return;
+      }
+      // Ctrl + S: Save code
+      if (cmdOrCtrl && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        const saveBtn = document.getElementById('codeLabSaveBtn');
+        if (saveBtn) saveBtn.click();
+        return;
+      }
+      // Ctrl + Shift + E: AI Assist & Review
+      if (cmdOrCtrl && e.shiftKey && (e.key === 'e' || e.key === 'E')) {
+        e.preventDefault();
+        const aiBtn = document.getElementById('codeLabAiBtn');
+        if (aiBtn) aiBtn.click();
+        return;
+      }
+      // Ctrl + Shift + R: Reset code
+      if (cmdOrCtrl && e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        const resetBtn = document.getElementById('codeLabResetBtn');
+        if (resetBtn) resetBtn.click();
+        return;
+      }
+    }
+  });
+}
+
+/* =====================================================================
+   COMMAND PALETTE (لوحة الأوامر والبحث الشامل)
+   ===================================================================== */
+let _paletteSelectedIndex = 0;
+let _paletteFilteredItems = [];
+let _paletteActiveFilter = 'all';
+
+const BASE_COMMAND_ITEMS = [
+  // Coding Labs
+  { id: 'lab-web', category: 'labs', title: 'معمل تطوير الويب (HTML/CSS/JS)', sub: 'محرر ويب تفاعلي مع كونسول وعرض حي فوري', shortcut: 'Ctrl+Shift+L', action: () => navigate('code-lab?tab=web'), icon: 'code' },
+  { id: 'lab-python', category: 'labs', title: 'معمل بايثون والخوارزميات (Python 3)', sub: 'تنفيذ كود بايثون حقيقي مع محلل زمني ودعم الهياكل', shortcut: 'Ctrl+Shift+L', action: () => navigate('code-lab?tab=python'), icon: 'cpu' },
+  { id: 'lab-sql', category: 'labs', title: 'معمل قواعد البيانات (SQL Database)', sub: 'استعلامات SQLite حية وجداول علائقية مسبقة التهيئة', shortcut: 'Ctrl+Shift+L', action: () => navigate('code-lab?tab=sql'), icon: 'database' },
+  // Navigation
+  { id: 'nav-home', category: 'nav', title: 'الصفحة الرئيسية', sub: 'واجهة سرمد والمسارات المميزة والأنشطة', shortcut: 'Alt+1', action: () => navigate(''), icon: 'home' },
+  { id: 'nav-tracks', category: 'nav', title: 'مسارات التعلم البرمجية', sub: 'استعراض كافة المسارات التقنية المتخصصة', shortcut: 'Alt+2', action: () => navigate('tracks'), icon: 'layers' },
+  { id: 'nav-codelab', category: 'nav', title: 'المعامل البرمجية التفاعلية', sub: 'بيئات تجربة واختبار الأكواد للمطورين', shortcut: 'Alt+3', action: () => navigate('code-lab'), icon: 'terminal' },
+  { id: 'nav-dashboard', category: 'nav', title: 'لوحة تحكم الطالب (لوحتي)', sub: 'متابعة التقدم والدروس المكتملة والنقاط', shortcut: 'Alt+4', action: () => navigate('dashboard'), icon: 'user' },
+  { id: 'nav-leaderboard', category: 'nav', title: 'لوحة المتصدرين والمتميزين', sub: 'ترتيب الطلاب المتفوقين ونقاط الخبرة', shortcut: 'Alt+5', action: () => navigate('leaderboard'), icon: 'award' },
+  { id: 'nav-articles', category: 'nav', title: 'المقالات البرمجية والدروس', sub: 'مقالات تقنية وشروحات معمارية معمقة', shortcut: 'Alt+6', action: () => navigate('articles'), icon: 'book' },
+  { id: 'nav-forum', category: 'nav', title: 'مجتمع ونقاشات سرمد', sub: 'طرح الأسئلة ومناقشة الحلول البرمجية مع الزملاء', shortcut: '', action: () => navigate('forum'), icon: 'message' },
+  { id: 'nav-science', category: 'nav', title: 'المختبر العلمي الذكي (BioLab)', sub: 'بنى البروتينات ثلاثية الأبعاد وAlphaFold', shortcut: '', action: () => navigate('science-lab'), icon: 'activity' },
+  // AI Tools
+  { id: 'ai-drawer', category: 'ai', title: 'فتح مساعد سرمد الذكي (Gemini)', sub: 'محادثة برمجية، فحص أكواد، وخطط دراسية مخصصة', shortcut: 'Ctrl+Shift+A', action: () => openAiDrawer(), icon: 'sparkles' },
+  { id: 'ai-page', category: 'ai', title: 'صفحة الذكاء الاصطناعي الشاملة', sub: 'شاشة المحادثة البرمجية الكاملة مع سرمد AI', shortcut: '', action: () => navigate('ai-chat'), icon: 'message' },
+  { id: 'ai-tip', category: 'ai', title: 'عرض نصيحة برمجية يومية', sub: 'نصائح برمجية ذكية وتخزين التفضيلات', shortcut: 'Ctrl+Shift+T', action: () => openDailyTipModal(), icon: 'bulb' },
+  // Actions & Utilities
+  { id: 'act-shortcuts', category: 'actions', title: 'دليل اختصارات لوحة المفاتيح', sub: 'استعراض كافة الاختصارات العالمية والعملية', shortcut: 'Ctrl+/', action: () => openShortcutsGuide(), icon: 'keyboard' },
+  { id: 'act-login', category: 'actions', title: 'تسجيل الدخول / إنشاء حساب', sub: 'الوصول إلى حسابك في منصة سرمد', shortcut: '', action: () => openAuth('login'), icon: 'lock' }
+];
+
+function initCommandPalette() {
+  const overlay = document.getElementById('commandPaletteOverlay');
+  const input = document.getElementById('commandPaletteInput');
+  const filtersHost = document.getElementById('commandPaletteFilters');
+  const resultsHost = document.getElementById('commandPaletteResults');
+  if (!overlay || !input || !resultsHost) return;
+
+  // Click outside to close
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeCommandPalette();
+  });
+
+  // Filter chips
+  if (filtersHost) {
+    filtersHost.addEventListener('click', (e) => {
+      const chip = e.target.closest('.palette-filter-chip');
+      if (!chip) return;
+      filtersHost.querySelectorAll('.palette-filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      _paletteActiveFilter = chip.dataset.palfilter || 'all';
+      renderCommandPaletteResults(input.value.trim());
+    });
+  }
+
+  // Input typing & keyboard navigation
+  input.addEventListener('input', () => {
+    _paletteSelectedIndex = 0;
+    renderCommandPaletteResults(input.value.trim());
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (_paletteFilteredItems.length > 0) {
+        _paletteSelectedIndex = (_paletteSelectedIndex + 1) % _paletteFilteredItems.length;
+        highlightPaletteSelection();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (_paletteFilteredItems.length > 0) {
+        _paletteSelectedIndex = (_paletteSelectedIndex - 1 + _paletteFilteredItems.length) % _paletteFilteredItems.length;
+        highlightPaletteSelection();
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (_paletteFilteredItems[_paletteSelectedIndex]) {
+        executePaletteItem(_paletteFilteredItems[_paletteSelectedIndex]);
+      }
+    }
+  });
+}
+
+function openCommandPalette() {
+  const overlay = document.getElementById('commandPaletteOverlay');
+  const input = document.getElementById('commandPaletteInput');
+  if (!overlay || !input) return;
+
+  overlay.classList.add('active');
+  input.value = '';
+  _paletteSelectedIndex = 0;
+  _paletteActiveFilter = 'all';
+
+  const filterChips = document.querySelectorAll('.palette-filter-chip');
+  filterChips.forEach(c => c.classList.toggle('active', c.dataset.palfilter === 'all'));
+
+  renderCommandPaletteResults('');
+  setTimeout(() => input.focus(), 60);
+}
+
+function closeCommandPalette() {
+  const overlay = document.getElementById('commandPaletteOverlay');
+  if (overlay) overlay.classList.remove('active');
+}
+
+function renderCommandPaletteResults(query) {
+  const resultsHost = document.getElementById('commandPaletteResults');
+  if (!resultsHost) return;
+
+  const q = query.toLowerCase().trim();
+
+  // Combine static commands with loaded tracks if available
+  let allItems = [...BASE_COMMAND_ITEMS];
+  if (window.CACHE && window.CACHE.tracks) {
+    window.CACHE.tracks.forEach(tr => {
+      allItems.push({
+        id: 'track-' + tr.id,
+        category: 'nav',
+        title: `مسار: ${tr.title}`,
+        sub: tr.desc || 'مسار تعليمي متكامل في منصة سرمد',
+        shortcut: '',
+        action: () => navigate(`track?id=${tr.id}`),
+        icon: 'book'
+      });
+    });
+  }
+
+  // Filter by category
+  if (_paletteActiveFilter !== 'all') {
+    allItems = allItems.filter(item => item.category === _paletteActiveFilter);
+  }
+
+  // Filter by query
+  if (q) {
+    allItems = allItems.filter(item => {
+      const matchTitle = (item.title || '').toLowerCase().includes(q);
+      const matchSub = (item.sub || '').toLowerCase().includes(q);
+      const matchCat = (item.category || '').toLowerCase().includes(q);
+      return matchTitle || matchSub || matchCat;
+    });
+  }
+
+  _paletteFilteredItems = allItems;
+  if (_paletteSelectedIndex >= _paletteFilteredItems.length) {
+    _paletteSelectedIndex = 0;
+  }
+
+  if (_paletteFilteredItems.length === 0) {
+    resultsHost.innerHTML = `
+      <div style="text-align:center; padding:32px 16px; color:var(--ink-soft); font-size:13.5px;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="opacity:0.5; margin-bottom:8px;"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <div>لا توجد نتائج مطابقة لـ "${escapeHtml(query)}"</div>
+        <div style="font-size:12px; margin-top:4px;">جرب البحث بكلمات أخرى مثل: معمل، بايثون، مسارات، نصيحة.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const html = _paletteFilteredItems.map((item, idx) => {
+    const isSel = idx === _paletteSelectedIndex;
+    const iconSvg = getPaletteIcon(item.icon);
+    const kbdBadge = item.shortcut ? `<kbd>${escapeHtml(item.shortcut)}</kbd>` : '';
+    return `
+      <div class="palette-item ${isSel ? 'selected' : ''}" data-idx="${idx}">
+        <div class="palette-item-left">
+          <div class="palette-item-icon">${iconSvg}</div>
+          <div class="palette-item-text">
+            <div class="palette-item-title">${escapeHtml(item.title)}</div>
+            <div class="palette-item-sub">${escapeHtml(item.sub)}</div>
+          </div>
+        </div>
+        <div class="palette-item-right">
+          ${kbdBadge}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  resultsHost.innerHTML = html;
+
+  // Add click handlers
+  resultsHost.querySelectorAll('.palette-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      if (_paletteFilteredItems[idx]) {
+        executePaletteItem(_paletteFilteredItems[idx]);
+      }
+    });
+  });
+}
+
+function highlightPaletteSelection() {
+  const resultsHost = document.getElementById('commandPaletteResults');
+  if (!resultsHost) return;
+  const items = resultsHost.querySelectorAll('.palette-item');
+  items.forEach((el, idx) => {
+    const isSel = idx === _paletteSelectedIndex;
+    el.classList.toggle('selected', isSel);
+    if (isSel) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  });
+}
+
+function executePaletteItem(item) {
+  closeCommandPalette();
+  if (item && typeof item.action === 'function') {
+    item.action();
+  }
+}
+
+function getPaletteIcon(name) {
+  if (name === 'code') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`;
+  if (name === 'cpu') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>`;
+  if (name === 'database') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`;
+  if (name === 'terminal') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`;
+  if (name === 'sparkles') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>`;
+  if (name === 'bulb') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-7 7c0 2.5 1.5 4.5 3 6h8c1.5-1.5 3-3.5 3-6a7 7 0 0 0-7-7z"/></svg>`;
+  if (name === 'keyboard') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/></svg>`;
+  if (name === 'award') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>`;
+  if (name === 'user') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+  if (name === 'layers') return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`;
+}
+
+/* =====================================================================
+   KEYBOARD SHORTCUTS GUIDE MODAL
+   ===================================================================== */
+function initShortcutsGuide() {
+  const overlay = document.getElementById('shortcutsGuideOverlay');
+  const closeBtn = document.getElementById('shortcutsGuideClose');
+  const gotItBtn = document.getElementById('shortcutsGuideGotIt');
+  if (!overlay) return;
+
+  if (closeBtn) closeBtn.addEventListener('click', closeShortcutsGuide);
+  if (gotItBtn) gotItBtn.addEventListener('click', closeShortcutsGuide);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeShortcutsGuide();
+  });
+}
+
+function openShortcutsGuide() {
+  const overlay = document.getElementById('shortcutsGuideOverlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+function closeShortcutsGuide() {
+  const overlay = document.getElementById('shortcutsGuideOverlay');
+  if (overlay) overlay.classList.remove('active');
+}
+
+/* =====================================================================
+   INTERACTIVE CODING LABS (معامل سرمد البرمجية المتكاملة)
+   ===================================================================== */
+let _activeLabTab = 'web'; // 'web' | 'python' | 'sql'
+let _activeWebFile = 'html'; // 'html' | 'css' | 'js'
+
+// Default lab storage and templates
+const CODE_LAB_TEMPLATES = {
+  web: {
+    todo: {
+      title: 'تطبيق مهام وملاحظات ذكي (Todo App)',
+      html: `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>تطبيق مهام سرمد</title>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">معمل الويب التفاعلي</div>
+    <h2>قائمة المهام اليومية</h2>
+    <p>جرّب إضافة المهام وحذفها مع مخرجات حية في الكونسول.</p>
+    <div class="input-row">
+      <input type="text" id="taskInput" placeholder="أضف مهمة جديدة...">
+      <button id="addBtn">إضافة</button>
+    </div>
+    <ul id="taskList"></ul>
+  </div>
+</body>
+</html>`,
+      css: `body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+  padding: 20px;
+}
+.card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+.badge {
+  display: inline-block;
+  background: rgba(0, 180, 136, 0.15);
+  color: #00b488;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+h2 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+}
+p {
+  color: #94a3b8;
+  font-size: 13.5px;
+  margin: 0 0 18px 0;
+}
+.input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+button {
+  background: #00b488;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+button:hover { opacity: 0.9; }
+ul { list-style: none; padding: 0; margin: 0; }
+li {
+  padding: 10px 12px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}`,
+      js: `console.log("تم تحميل تطبيق المهام بنجاح داخل معمل سرمد!");
+
+const input = document.getElementById("taskInput");
+const addBtn = document.getElementById("addBtn");
+const list = document.getElementById("taskList");
+
+function addTask() {
+  const text = input.value.trim();
+  if (!text) return;
+  
+  const li = document.createElement("li");
+  li.innerHTML = \`<span>\${text}</span> <button style="padding:4px 8px; font-size:12px; background:#ef4444;">حذف</button>\`;
+  
+  li.querySelector("button").onclick = () => {
+    li.remove();
+    console.log("تم حذف المهمة:", text);
+  };
+  
+  list.appendChild(li);
+  console.log("تمت إضافة مهمة جديدة:", text);
+  input.value = "";
+}
+
+addBtn.addEventListener("click", addTask);
+input.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") addTask();
+});`
+    },
+    clock: {
+      title: 'ساعة رقمية ومؤقت دقيق (Digital Clock & Timer)',
+      html: `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>الساعة الرقمية</title>
+</head>
+<body>
+  <div class="clock-card">
+    <div class="clock-label">الوقت الحالي بتوقيت الرياض / مكة المكرمة</div>
+    <div id="clockDisplay" class="clock-time">00:00:00</div>
+    <div id="dateDisplay" class="clock-date">اليوم والتحية</div>
+    <button id="tickBtn">تحديث النبضة</button>
+  </div>
+</body>
+</html>`,
+      css: `body {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  background: #030712;
+  color: #38bdf8;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+.clock-card {
+  text-align: center;
+  background: #0f172a;
+  border: 2px solid #1e293b;
+  border-radius: 20px;
+  padding: 36px 48px;
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.15);
+}
+.clock-label {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 14px;
+}
+.clock-time {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #38bdf8;
+  margin-bottom: 12px;
+}
+.clock-date {
+  font-size: 14px;
+  color: #00b488;
+  margin-bottom: 20px;
+}
+button {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+}`,
+      js: `function updateClock() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('ar-SA');
+  const dateStr = now.toLocaleDateString('ar-SA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  
+  const clockEl = document.getElementById("clockDisplay");
+  const dateEl = document.getElementById("dateDisplay");
+  if (clockEl) clockEl.textContent = timeStr;
+  if (dateEl) dateEl.textContent = dateStr;
+  
+  console.log("الوقت المحدث:", timeStr);
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+document.getElementById("tickBtn").onclick = () => {
+  updateClock();
+  console.log("تمت مزامنة الساعة يدوياً");
+};`
+    },
+    gradient: {
+      title: 'مولد التدرجات اللونية (CSS Gradient Maker)',
+      html: `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>مولد التدرجات</title>
+</head>
+<body>
+  <div class="box">
+    <h3>مولد الخلفيات المتدرجة</h3>
+    <div id="previewBox" class="preview"></div>
+    <div class="controls">
+      <input type="color" id="c1" value="#155FDB">
+      <input type="color" id="c2" value="#00B488">
+      <button id="randBtn">توليد عشوائي</button>
+    </div>
+    <code id="cssCode">background: linear-gradient(135deg, #155FDB, #00B488);</code>
+  </div>
+</body>
+</html>`,
+      css: `body {
+  font-family: system-ui, sans-serif;
+  background: #111827;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+.box {
+  background: #1f2937;
+  border-radius: 16px;
+  padding: 24px;
+  width: 380px;
+  text-align: center;
+}
+.preview {
+  height: 140px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #155FDB, #00B488);
+  transition: background 0.3s ease;
+}
+.controls {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+input[type="color"] {
+  width: 44px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: none;
+}
+button {
+  background: #00B488;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+code {
+  display: block;
+  font-size: 11px;
+  padding: 10px;
+  background: #111827;
+  border-radius: 8px;
+  color: #38bdf8;
+  direction: ltr;
+}`,
+      js: `const c1 = document.getElementById("c1");
+const c2 = document.getElementById("c2");
+const prev = document.getElementById("previewBox");
+const code = document.getElementById("cssCode");
+const rand = document.getElementById("randBtn");
+
+function update() {
+  const css = \`linear-gradient(135deg, \${c1.value}, \${c2.value})\`;
+  prev.style.background = css;
+  code.textContent = \`background: \${css};\`;
+  console.log("كود التدرج اللوني المحدث:", css);
+}
+
+c1.oninput = update;
+c2.oninput = update;
+
+rand.onclick = () => {
+  c1.value = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+  c2.value = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+  update();
+};`
+    }
+  },
+  python: {
+    binarySearch: {
+      title: 'خوارزمية البحث الثنائي (Binary Search)',
+      code: `# معمل بايثون والخوارزميات في منصة سرمد
+# يمكنك تشغيل الكود فوراً بالضغط على تشغيل أو (Ctrl + Enter)
+
+def binary_search(arr, target):
+    """
+    خوارزمية البحث الثنائي - التعقيد الزمني: O(log n)
+    """
+    left, right = 0, len(arr) - 1
+    steps = 0
+    
+    while left <= right:
+        steps += 1
+        mid = (left + right) // 2
+        print(f"الخطوة {steps}: فحص العنصر في المؤشر {mid} (القيمة: {arr[mid]})")
+        
+        if arr[mid] == target:
+            return mid, steps
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+            
+    return -1, steps
+
+# تجربة الخوارزمية مع قائمة مرتبة
+numbers = [2, 5, 8, 12, 16, 23, 38, 45, 56, 72, 91]
+target_val = 23
+
+print("القائمة المدخلة:", numbers)
+print("القيمة المستهدفة:", target_val)
+print("-" * 45)
+
+index, total_steps = binary_search(numbers, target_val)
+
+if index != -1:
+    print(f"تم العثور على القيمة {target_val} في الفهرس [{index}] خلال {total_steps} خطوات فقط!")
+else:
+    print(f"القيمة {target_val} غير موجودة في القائمة.")`
+    },
+    palindrome: {
+      title: 'فحص السلاسل المتناظرة (Palindrome & Two Pointers)',
+      code: `# فحص السلاسل النصية المتناظرة باستخدام مؤشرين (Two Pointers)
+# الكلمة المتناظرة تقرأ من اليمين كقراءتها من اليسار
+
+def is_palindrome(text):
+    clean = "".join(ch.lower() for ch in text if ch.isalnum())
+    left, right = 0, len(clean) - 1
+    
+    while left < right:
+        if clean[left] != clean[right]:
+            return False
+        left += 1
+        right -= 1
+        
+    return True
+
+test_cases = [
+    "سرمد",
+    "توت",
+    "A man, a plan, a canal: Panama",
+    "Race a car",
+    "باب",
+    "خالد"
+]
+
+print("نتائج فحص السلاسل المتناظرة:")
+print("=" * 40)
+for t in test_cases:
+    res = "نعم (متناظرة)" if is_palindrome(t) else "لا (غير متناظرة)"
+    print(f"النص: '{t}' -> {res}")`
+    },
+    fibonacci: {
+      title: 'متتالية فيبوناتشي بالبرمجة الديناميكية (Dynamic Programming)',
+      code: `# حساب متتالية فيبوناتشي باستخدام الحفظ (Memoization)
+# التعقيد الزمني: O(n) بدلاً من O(2^n) التكراري العادي
+
+import time
+
+def fib_memo(n, memo={}):
+    if n in memo:
+        return memo[n]
+    if n <= 1:
+        return n
+    memo[n] = fib_memo(n - 1, memo) + fib_memo(n - 2, memo)
+    return memo[n]
+
+print("متتالية فيبوناتشي لأول 15 حداً:")
+print("-" * 35)
+
+for i in range(16):
+    val = fib_memo(i)
+    print(f"F({i:2d}) = {val}")
+
+print("\\nتجربة قيمة كبيرة بفضل البرمجة الديناميكية:")
+start = time.time()
+big_val = fib_memo(50)
+dur = (time.time() - start) * 1000
+print(f"F(50) = {big_val} (استغرق {dur:.3f} مللي ثانية)")`
+    },
+    stack: {
+      title: 'تنفيذ هيكل بيانات المكدس والرتل (Stack & Queue)',
+      code: `# تنفيذ هيكل المكدس (LIFO - Last In First Out)
+class Stack:
+    def __init__(self):
+        self._items = []
+
+    def push(self, item):
+        self._items.append(item)
+        print(f"إضافة عنصر: {item}")
+
+    def pop(self):
+        if self.is_empty():
+            return None
+        val = self._items.pop()
+        print(f"سحب عنصر: {val}")
+        return val
+
+    def peek(self):
+        return self._items[-1] if not self.is_empty() else None
+
+    def is_empty(self):
+        return len(self._items) == 0
+
+    def size(self):
+        return len(self._items)
+
+s = Stack()
+print("تجربة المكدس في منصة سرمد:")
+s.push("الدرس الأول: متغيرات")
+s.push("الدرس الثاني: دوال")
+s.push("الدرس الثالث: هياكل بيانات")
+
+print(f"العنصر في القمة: {s.peek()}")
+s.pop()
+print(f"حجم المكدس الحالي: {s.size()}")`
+    }
+  },
+  sql: {
+    topStudents: {
+      title: 'أفضل الطلاب والدرجات (JOIN & ORDER BY)',
+      code: `-- استعلام: ربط الطلاب بدوراتهم ودرجاتهم وترتيبهم تنازلياً
+SELECT 
+  s.name AS اسم_الطالب,
+  s.track AS المسار,
+  c.title AS عنوان_الدورة,
+  e.grade AS الدرجة_النهائية,
+  e.completed_at AS تاريخ_الإكمال
+FROM enrollments e
+JOIN students s ON s.id = e.student_id
+JOIN courses c ON c.id = e.course_id
+WHERE e.grade >= 90.0
+ORDER BY e.grade DESC;`
+    },
+    courseStats: {
+      title: 'إحصائيات الدورات ومتوسط الدرجات (GROUP BY & AVG)',
+      code: `-- حساب عدد الطلاب المسجلين ومتوسط درجاتهم لكل دورة
+SELECT 
+  c.title AS الدورة,
+  c.category AS التصنيف,
+  COUNT(e.student_id) AS عدد_الطلاب_المسجلين,
+  ROUND(AVG(e.grade), 2) AS متوسط_الدرجات
+FROM courses c
+LEFT JOIN enrollments e ON c.id = e.course_id
+GROUP BY c.id
+ORDER BY عدد_الطلاب_المسجلين DESC;`
+    },
+    allStudents: {
+      title: 'استعراض بيانات الطلاب ونقاط الخبرة (SELECT students)',
+      code: `-- عرض جدول الطلاب بالكامل مرتبين حسب نقاط الخبرة
+SELECT 
+  id,
+  name AS اسم_الطالب,
+  email AS البريد_الإلكتروني,
+  track AS مسار_التعلم,
+  level AS المستوى,
+  xp AS نقاط_الخبرة
+FROM students
+ORDER BY xp DESC;`
+    },
+    insertDemo: {
+      title: 'إضافة طالب جديد واستعلامه (INSERT & SELECT)',
+      code: `-- إضافة طالب جديد وتحديث بياناته
+INSERT INTO students (name, email, track, level, xp)
+VALUES ('عبدالرحمن السعيد', 'abdulrahman@sarmad.edu', 'تطوير الويب الشامل', 'مبتدئ', 300);
+
+-- استعراض الطالب المضاف
+SELECT * FROM students WHERE email = 'abdulrahman@sarmad.edu';`
+    }
+  }
+};
+
+// Global active lab code cache
+let _codeLabState = {
+  web: {
+    html: CODE_LAB_TEMPLATES.web.todo.html,
+    css: CODE_LAB_TEMPLATES.web.todo.css,
+    js: CODE_LAB_TEMPLATES.web.todo.js
+  },
+  python: CODE_LAB_TEMPLATES.python.binarySearch.code,
+  sql: CODE_LAB_TEMPLATES.sql.topStudents.code,
+  terminalLogs: []
+};
+
+// Load saved state from localStorage if available
+try {
+  const savedLab = localStorage.getItem('sarmad_codelab_state');
+  if (savedLab) {
+    const parsed = JSON.parse(savedLab);
+    if (parsed.web) _codeLabState.web = parsed.web;
+    if (parsed.python) _codeLabState.python = parsed.python;
+    if (parsed.sql) _codeLabState.sql = parsed.sql;
+  }
+} catch (e) {}
+
+async function renderCodeLab(param) {
+  // Support deep linking to a specific tab: #/code-lab?tab=python
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+  const tabParam = urlParams.get('tab');
+  if (tabParam && ['web', 'python', 'sql'].includes(tabParam)) {
+    _activeLabTab = tabParam;
+  }
+
+  appRoot.innerHTML = `
+    <div class="codelab-shell" id="codeLabWorkspace">
+      <!-- HERO -->
+      <div class="codelab-hero">
+        <div class="codelab-title-area">
+          <h1>المعامل البرمجية التفاعلية (Coding Labs)</h1>
+          <p>مختبرات برمجية سحابية لتجربة وفحص الأكواد بلغات متعددة (Web, Python, SQL) مع دعم التحليل الذكي وتوليد الاختبارات واختصارات لوحة المفاتيح الاحترافية.</p>
+        </div>
+        <div class="codelab-shortcuts-badge" id="labShortcutsTrigger" title="استعراض اختصارات المحرر">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/></svg>
+          <span>اختصارات المعمل: <kbd>Ctrl+Enter</kbd> تشغيل · <kbd>Ctrl+S</kbd> حفظ</span>
+        </div>
+      </div>
+
+      <!-- LAB TABS SWITCHER -->
+      <div class="codelab-nav-tabs">
+        <button class="codelab-tab-btn ${_activeLabTab === 'web' ? 'active' : ''}" data-lab="web">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>معمل الويب الشامل (HTML / CSS / JS)</span>
+          <span class="lab-count-badge">عرض حي</span>
+        </button>
+        <button class="codelab-tab-btn ${_activeLabTab === 'python' ? 'active' : ''}" data-lab="python">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+          <span>معمل بايثون والخوارزميات (Python 3)</span>
+          <span class="lab-count-badge">محرك حقيقي</span>
+        </button>
+        <button class="codelab-tab-btn ${_activeLabTab === 'sql' ? 'active' : ''}" data-lab="sql">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span>معمل قواعد البيانات (SQL Database)</span>
+          <span class="lab-count-badge">SQLite</span>
+        </button>
+      </div>
+
+      <!-- WORKSPACE TOOLBAR -->
+      <div class="codelab-toolbar">
+        <div class="codelab-toolbar-left">
+          <label style="font-size:12.5px; font-weight:600; color:var(--ink-soft); display:flex; align-items:center; gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            <span>القوالب الجاهزة:</span>
+          </label>
+          <select id="codeLabTemplateSelect" class="codelab-template-select">
+            <!-- Dynamically populated based on active lab -->
+          </select>
+        </div>
+
+        <div class="codelab-toolbar-right">
+          <button class="codelab-action-btn run-btn" id="codeLabRunBtn" type="button" title="تشغيل الكود (Ctrl+Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>تشغيل الكود</span>
+            <kbd style="background:rgba(255,255,255,0.25); color:#fff; border-color:transparent;">Ctrl+Enter</kbd>
+          </button>
+          <button class="codelab-action-btn ai-btn" id="codeLabAiBtn" type="button" title="فحص وشرح الكود الذكي (Ctrl+Shift+E)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+            <span>ذكاء سرمد</span>
+          </button>
+          <button class="codelab-action-btn" id="codeLabSaveBtn" type="button" title="حفظ الكود محلياً (Ctrl+S)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span>حفظ</span>
+          </button>
+          <button class="codelab-action-btn" id="codeLabExportBtn" type="button" title="تنزيل الكود كملف">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>تصدير</span>
+          </button>
+          <button class="codelab-action-btn" id="codeLabResetBtn" type="button" title="إعادة تعيين الكود للقالب">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>إعادة ضبط</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- MAIN SPLIT WORKSPACE -->
+      <div class="codelab-workspace" id="codeLabSplit">
+        <!-- LEFT: CODE EDITOR -->
+        <div class="codelab-editor-pane">
+          <!-- Web File Tabs (only for Web) -->
+          <div class="codelab-file-tabs" id="codeLabFileTabs" style="${_activeLabTab === 'web' ? 'display:flex;' : 'display:none;'}">
+            <button class="codelab-file-tab ${_activeWebFile === 'html' ? 'active' : ''}" data-file="html">index.html</button>
+            <button class="codelab-file-tab ${_activeWebFile === 'css' ? 'active' : ''}" data-file="css">style.css</button>
+            <button class="codelab-file-tab ${_activeWebFile === 'js' ? 'active' : ''}" data-file="js">script.js</button>
+          </div>
+
+          <!-- Single File Header (for Python & SQL) -->
+          <div class="codelab-file-tabs" id="codeLabSingleFileTab" style="${_activeLabTab !== 'web' ? 'display:flex;' : 'display:none;'}">
+            <span class="codelab-file-tab active" id="codeLabSingleFileName">
+              ${_activeLabTab === 'python' ? 'main.py' : 'query.sql'}
+            </span>
+          </div>
+
+          <!-- Textarea with Line Numbers -->
+          <div class="codelab-editor-wrap">
+            <div class="codelab-line-numbers" id="codeLabLineNumbers">1</div>
+            <textarea class="codelab-textarea" id="codeLabEditor" spellcheck="false" autocomplete="off" wrap="off"></textarea>
+          </div>
+
+          <!-- Editor Footer Status -->
+          <div class="codelab-editor-footer">
+            <span id="codeLabCursorStatus">السطر: 1 · العمود: 1</span>
+            <span id="codeLabLangStatus">${_activeLabTab.toUpperCase()}</span>
+          </div>
+        </div>
+
+        <!-- RIGHT: LIVE OUTPUT / TERMINAL / SQL TABLE -->
+        <div class="codelab-output-pane">
+          <div class="codelab-output-header">
+            <span id="codeLabOutputTitle">المعاينة الحية والكونسول</span>
+            <span id="codeLabExecTime" style="font-family:ui-monospace, monospace; color:#38BDF8;"></span>
+          </div>
+
+          <!-- Web Output: Iframe Sandbox + Live Console -->
+          <div id="codeLabWebOutputWrap" style="flex:1; display:${_activeLabTab === 'web' ? 'flex' : 'none'}; flex-direction:column;">
+            <iframe class="codelab-live-frame" id="codeLabIframe" sandbox="allow-scripts allow-modals" title="معاينة حية"></iframe>
+            <div style="background:#090F20; border-top:1px solid #1E293B; padding:6px 14px; font-size:11.5px; color:#94A3B8; display:flex; justify-content:space-between; align-items:center;">
+              <span>مخرجات Console المباشرة:</span>
+              <button type="button" id="codeLabClearConsoleBtn" style="background:none; border:none; color:#38BDF8; cursor:pointer; font-size:11px;">مسح السجل</button>
+            </div>
+            <div class="codelab-terminal" id="codeLabWebTerminal" style="height:140px; border-top:none;">
+              <div class="codelab-terminal-line dim">جاهز لاستقبال مخرجات console.log...</div>
+            </div>
+          </div>
+
+          <!-- Python Output: Terminal Console -->
+          <div id="codeLabPythonOutputWrap" style="flex:1; display:${_activeLabTab === 'python' ? 'flex' : 'none'}; flex-direction:column;">
+            <div class="codelab-terminal" id="codeLabPythonTerminal">
+              <div class="codelab-terminal-line dim">اضغط على "تشغيل الكود" أو (Ctrl + Enter) لتنفيذ برنامج بايثون...</div>
+            </div>
+          </div>
+
+          <!-- SQL Output: Relational Results Table & Schema Reference -->
+          <div id="codeLabSqlOutputWrap" style="flex:1; display:${_activeLabTab === 'sql' ? 'flex' : 'none'}; flex-direction:column;">
+            <div class="codelab-sql-results-wrap" id="codeLabSqlResults">
+              <div style="color:#94A3B8; font-size:13px; text-align:center; padding:30px;">
+                اضغط على "تشغيل الكود" لتنفيذ استعلام SQL واسترجاع البيانات.
+              </div>
+            </div>
+            <!-- SQL Schema Reference Accordion -->
+            <div class="codelab-schema-box">
+              <div class="codelab-schema-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                <span>الجداول المتاحة في قاعدة البيانات للتجربة:</span>
+              </div>
+              <div>• <code>students</code> (id, name, email, track, level, xp)</div>
+              <div>• <code>courses</code> (id, title, category, hours, price)</div>
+              <div>• <code>enrollments</code> (id, student_id, course_id, grade, completed_at)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI LAB ASSISTANT DOCK -->
+      <div class="codelab-ai-dock" id="codeLabAiDock">
+        <div class="codelab-ai-dock-header">
+          <div class="codelab-ai-dock-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+            <span>المساعد البرمجي الذكي للمعمل (Powered by Gemini)</span>
+          </div>
+          <span style="font-size:12px; color:var(--ink-soft);">تحليل فوري واختبارات للأكواد الحالية</span>
+        </div>
+
+        <div class="codelab-ai-chips">
+          <button class="codelab-ai-chip" data-aiact="explain">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>شرح الكود خطوة بخطوة</span>
+          </button>
+          <button class="codelab-ai-chip" data-aiact="debug">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+            <span>فحص الأخطاء والتصحيح</span>
+          </button>
+          <button class="codelab-ai-chip" data-aiact="optimize">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span>تحسين الأداء وClean Code</span>
+          </button>
+          <button class="codelab-ai-chip" data-aiact="test">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span>توليد حالات اختبار (Test Cases)</span>
+          </button>
+          <button class="codelab-ai-chip" data-aiact="challenge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span>اقتراح تحدٍ جديد</span>
+          </button>
+        </div>
+
+        <div class="codelab-ai-response-box" id="codeLabAiResponse" style="display:none;">
+          <!-- AI markdown output -->
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Attach interactive behavior and listeners
+  initCodeLabListeners();
+}
+
+function initCodeLabListeners() {
+  const workspace = document.getElementById('codeLabWorkspace');
+  if (!workspace) return;
+
+  const editor = document.getElementById('codeLabEditor');
+  const lineNumbers = document.getElementById('codeLabLineNumbers');
+  const templateSelect = document.getElementById('codeLabTemplateSelect');
+  const runBtn = document.getElementById('codeLabRunBtn');
+  const saveBtn = document.getElementById('codeLabSaveBtn');
+  const exportBtn = document.getElementById('codeLabExportBtn');
+  const resetBtn = document.getElementById('codeLabResetBtn');
+  const aiBtn = document.getElementById('codeLabAiBtn');
+  const shortcutsTrigger = document.getElementById('labShortcutsTrigger');
+  const clearConsoleBtn = document.getElementById('codeLabClearConsoleBtn');
+
+  if (shortcutsTrigger) {
+    shortcutsTrigger.addEventListener('click', openShortcutsGuide);
+  }
+
+  // Populate templates dropdown for current tab
+  updateCodeLabTemplateSelect();
+
+  // Load editor content for current tab and file
+  loadEditorContent();
+
+  // Handle Tab key in editor (insert 2 spaces instead of leaving textarea)
+  editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+      editor.selectionStart = editor.selectionEnd = start + 2;
+      updateCodeLabLineNumbers();
+      saveCurrentEditorToState();
+    }
+  });
+
+  // Editor typing updates line numbers and state
+  editor.addEventListener('input', () => {
+    updateCodeLabLineNumbers();
+    saveCurrentEditorToState();
+  });
+
+  // Track cursor position
+  editor.addEventListener('keyup', updateCursorStatus);
+  editor.addEventListener('click', updateCursorStatus);
+
+  // Switch between Lab Tabs (Web / Python / SQL)
+  document.querySelectorAll('.codelab-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      saveCurrentEditorToState();
+      document.querySelectorAll('.codelab-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _activeLabTab = btn.dataset.lab;
+
+      // Update UI displays
+      document.getElementById('codeLabFileTabs').style.display = _activeLabTab === 'web' ? 'flex' : 'none';
+      document.getElementById('codeLabSingleFileTab').style.display = _activeLabTab !== 'web' ? 'flex' : 'none';
+      const singleFileName = document.getElementById('codeLabSingleFileName');
+      if (singleFileName) {
+        singleFileName.textContent = _activeLabTab === 'python' ? 'main.py' : 'query.sql';
+      }
+
+      document.getElementById('codeLabWebOutputWrap').style.display = _activeLabTab === 'web' ? 'flex' : 'none';
+      document.getElementById('codeLabPythonOutputWrap').style.display = _activeLabTab === 'python' ? 'flex' : 'none';
+      document.getElementById('codeLabSqlOutputWrap').style.display = _activeLabTab === 'sql' ? 'flex' : 'none';
+
+      document.getElementById('codeLabLangStatus').textContent = _activeLabTab.toUpperCase();
+      document.getElementById('codeLabOutputTitle').textContent = 
+        _activeLabTab === 'web' ? 'المعاينة الحية والكونسول' :
+        _activeLabTab === 'python' ? 'شاشة الأوامر والطرفية (Terminal Output)' :
+        'نتائج استعلام SQLite وجداول البيانات';
+
+      updateCodeLabTemplateSelect();
+      loadEditorContent();
+
+      // Automatically execute preview for Web
+      if (_activeLabTab === 'web') {
+        runActiveCodeLab();
+      }
+    });
+  });
+
+  // Switch between Web Files (HTML / CSS / JS)
+  document.querySelectorAll('.codelab-file-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (!tab.dataset.file) return;
+      saveCurrentEditorToState();
+      document.querySelectorAll('.codelab-file-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      _activeWebFile = tab.dataset.file;
+      loadEditorContent();
+    });
+  });
+
+  // Template select change
+  templateSelect.addEventListener('change', () => {
+    const val = templateSelect.value;
+    if (!val) return;
+    loadTemplatePreset(val);
+  });
+
+  // Run Button
+  runBtn.addEventListener('click', runActiveCodeLab);
+
+  // Save Button
+  saveBtn.addEventListener('click', () => {
+    saveCurrentEditorToState();
+    try {
+      localStorage.setItem('sarmad_codelab_state', JSON.stringify(_codeLabState));
+      toast('تم حفظ كود المعمل البرمجي بنجاح');
+    } catch (e) {
+      toast('تم حفظ الكود في الجلسة الحالية');
+    }
+  });
+
+  // Export / Download File
+  exportBtn.addEventListener('click', exportActiveCodeLab);
+
+  // Reset Button
+  resetBtn.addEventListener('click', () => {
+    if (confirm('هل ترغب بإعادة تعيين الكود إلى القالب الأساسي؟ سيتم مسح التعديلات غير المحفوظة.')) {
+      resetActiveCodeLab();
+    }
+  });
+
+  // AI Assist Quick Trigger
+  aiBtn.addEventListener('click', () => {
+    const dock = document.getElementById('codeLabAiDock');
+    if (dock) {
+      dock.scrollIntoView({ behavior: 'smooth' });
+      triggerCodeLabAiAssist('explain');
+    }
+  });
+
+  // AI Chips
+  document.querySelectorAll('.codelab-ai-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.codelab-ai-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      triggerCodeLabAiAssist(chip.dataset.aiact);
+    });
+  });
+
+  // Clear Console Button
+  if (clearConsoleBtn) {
+    clearConsoleBtn.addEventListener('click', () => {
+      const term = document.getElementById('codeLabWebTerminal');
+      if (term) term.innerHTML = '<div class="codelab-terminal-line dim">تم مسح سجل الكونسول.</div>';
+    });
+  }
+
+  // Initial Run for Web
+  if (_activeLabTab === 'web') {
+    runActiveCodeLab();
+  }
+}
+
+function updateCodeLabTemplateSelect() {
+  const select = document.getElementById('codeLabTemplateSelect');
+  if (!select) return;
+
+  let optionsHtml = '';
+  if (_activeLabTab === 'web') {
+    optionsHtml = `
+      <option value="todo">تطبيق المهام اليومية (Todo App)</option>
+      <option value="clock">ساعة رقمية ومؤقت (Digital Clock)</option>
+      <option value="gradient">مولد التدرجات اللونية (CSS Gradient)</option>
+    `;
+  } else if (_activeLabTab === 'python') {
+    optionsHtml = `
+      <option value="binarySearch">خوارزمية البحث الثنائي (Binary Search)</option>
+      <option value="palindrome">فحص السلاسل المتناظرة (Palindrome)</option>
+      <option value="fibonacci">فيبوناتشي بالبرمجة الديناميكية (Memoization)</option>
+      <option value="stack">هيكل بيانات المكدس (Stack)</option>
+    `;
+  } else if (_activeLabTab === 'sql') {
+    optionsHtml = `
+      <option value="topStudents">أفضل الطلاب والدرجات (JOIN & ORDER BY)</option>
+      <option value="courseStats">إحصائيات الدورات ومتوسط الدرجات (GROUP BY)</option>
+      <option value="allStudents">استعراض بيانات الطلاب (SELECT * students)</option>
+      <option value="insertDemo">إضافة طالب جديد (INSERT Demo)</option>
+    `;
+  }
+  select.innerHTML = optionsHtml;
+}
+
+function loadTemplatePreset(key) {
+  if (_activeLabTab === 'web' && CODE_LAB_TEMPLATES.web[key]) {
+    const t = CODE_LAB_TEMPLATES.web[key];
+    _codeLabState.web.html = t.html;
+    _codeLabState.web.css = t.css;
+    _codeLabState.web.js = t.js;
+  } else if (_activeLabTab === 'python' && CODE_LAB_TEMPLATES.python[key]) {
+    _codeLabState.python = CODE_LAB_TEMPLATES.python[key].code;
+  } else if (_activeLabTab === 'sql' && CODE_LAB_TEMPLATES.sql[key]) {
+    _codeLabState.sql = CODE_LAB_TEMPLATES.sql[key].code;
+  }
+  loadEditorContent();
+  runActiveCodeLab();
+  toast('تم تحميل القالب بنجاح');
+}
+
+function resetActiveCodeLab() {
+  const templateSelect = document.getElementById('codeLabTemplateSelect');
+  const key = templateSelect ? templateSelect.value : null;
+  if (key) {
+    loadTemplatePreset(key);
+  }
+}
+
+function loadEditorContent() {
+  const editor = document.getElementById('codeLabEditor');
+  if (!editor) return;
+
+  if (_activeLabTab === 'web') {
+    editor.value = _codeLabState.web[_activeWebFile] || '';
+  } else if (_activeLabTab === 'python') {
+    editor.value = _codeLabState.python || '';
+  } else if (_activeLabTab === 'sql') {
+    editor.value = _codeLabState.sql || '';
+  }
+
+  updateCodeLabLineNumbers();
+  updateCursorStatus();
+}
+
+function saveCurrentEditorToState() {
+  const editor = document.getElementById('codeLabEditor');
+  if (!editor) return;
+
+  if (_activeLabTab === 'web') {
+    _codeLabState.web[_activeWebFile] = editor.value;
+  } else if (_activeLabTab === 'python') {
+    _codeLabState.python = editor.value;
+  } else if (_activeLabTab === 'sql') {
+    _codeLabState.sql = editor.value;
+  }
+}
+
+function updateCodeLabLineNumbers() {
+  const editor = document.getElementById('codeLabEditor');
+  const lineNumbers = document.getElementById('codeLabLineNumbers');
+  if (!editor || !lineNumbers) return;
+
+  const lines = editor.value.split('\n').length;
+  let numbersText = '';
+  for (let i = 1; i <= lines; i++) {
+    numbersText += i + '\n';
+  }
+  lineNumbers.textContent = numbersText;
+}
+
+function updateCursorStatus() {
+  const editor = document.getElementById('codeLabEditor');
+  const cursorStatus = document.getElementById('codeLabCursorStatus');
+  if (!editor || !cursorStatus) return;
+
+  const val = editor.value.substring(0, editor.selectionStart);
+  const lines = val.split('\n');
+  const lineNum = lines.length;
+  const colNum = lines[lines.length - 1].length + 1;
+  cursorStatus.textContent = `السطر: ${lineNum} · العمود: ${colNum}`;
+}
+
+async function runActiveCodeLab() {
+  saveCurrentEditorToState();
+  const execTimeEl = document.getElementById('codeLabExecTime');
+  const runBtn = document.getElementById('codeLabRunBtn');
+
+  if (runBtn) {
+    runBtn.style.opacity = '0.7';
+    runBtn.style.pointerEvents = 'none';
+  }
+
+  const startTime = Date.now();
+
+  try {
+    if (_activeLabTab === 'web') {
+      // 1. Web Execution Sandbox
+      const iframe = document.getElementById('codeLabIframe');
+      const terminal = document.getElementById('codeLabWebTerminal');
+      if (terminal) {
+        terminal.innerHTML = '<div class="codelab-terminal-line dim">جارٍ تشغيل كود الويب...</div>';
+      }
+
+      const rawHtml = _codeLabState.web.html || '';
+      const rawCss = _codeLabState.web.css || '';
+      const rawJs = _codeLabState.web.js || '';
+
+      // Console interceptor script to inject into iframe
+      const consoleInterceptor = `
+        <script>
+          (function(){
+            function sendLog(type, args){
+              var msg = Array.prototype.slice.call(args).map(function(a){
+                try {
+                  return (typeof a === 'object') ? JSON.stringify(a) : String(a);
+                } catch(e) { return String(a); }
+              }).join(' ');
+              window.parent.postMessage({ type: 'sarmad_lab_log', logType: type, message: msg }, '*');
+            }
+            var _log = console.log, _warn = console.warn, _err = console.error, _info = console.info;
+            console.log = function(){ sendLog('out', arguments); _log.apply(console, arguments); };
+            console.warn = function(){ sendLog('err', arguments); _warn.apply(console, arguments); };
+            console.error = function(){ sendLog('err', arguments); _err.apply(console, arguments); };
+            console.info = function(){ sendLog('info', arguments); _info.apply(console, arguments); };
+            window.onerror = function(msg, url, line){
+              sendLog('err', ['خطأ وقت التشغيل (سطر ' + line + '): ' + msg]);
+            };
+          })();
+        </script>
+      `;
+
+      const completeDoc = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>${rawCss}</style>
+          ${consoleInterceptor}
+        </head>
+        <body>
+          ${rawHtml}
+          <script>${rawJs}<\/script>
+        </body>
+        </html>
+      `;
+
+      // Set iframe srcdoc
+      iframe.srcdoc = completeDoc;
+
+      // Handle captured console logs from iframe
+      window.onmessage = function(e) {
+        if (e.data && e.data.type === 'sarmad_lab_log') {
+          if (terminal) {
+            const line = document.createElement('div');
+            line.className = 'codelab-terminal-line ' + (e.data.logType || 'out');
+            line.textContent = `> ${e.data.message}`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+          }
+        }
+      };
+
+      const dur = Date.now() - startTime;
+      if (execTimeEl) execTimeEl.textContent = `تنفيذ حي (${dur} ms)`;
+
+    } else if (_activeLabTab === 'python') {
+      // 2. Python Execution via Server API
+      const terminal = document.getElementById('codeLabPythonTerminal');
+      if (terminal) {
+        terminal.innerHTML = '<div class="codelab-terminal-line dim">جارٍ تنفيذ الكود في بيئة بايثون 3...</div>';
+      }
+
+      const res = await fetch('/api/lab/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: 'python',
+          code: _codeLabState.python
+        })
+      });
+
+      const data = await res.json();
+      if (execTimeEl) execTimeEl.textContent = `زمن التنفيذ: ${data.executionTimeMs || 0} ms`;
+
+      if (terminal) {
+        terminal.innerHTML = '';
+        if (data.stdout) {
+          const lines = data.stdout.split('\n');
+          lines.forEach(l => {
+            const d = document.createElement('div');
+            d.className = 'codelab-terminal-line out';
+            d.textContent = l;
+            terminal.appendChild(d);
+          });
+        }
+        if (data.stderr) {
+          const errLines = data.stderr.split('\n');
+          errLines.forEach(l => {
+            const d = document.createElement('div');
+            d.className = 'codelab-terminal-line err';
+            d.textContent = l;
+            terminal.appendChild(d);
+          });
+        }
+        if (!data.stdout && !data.stderr) {
+          terminal.innerHTML = '<div class="codelab-terminal-line info">تم تنفيذ البرنامج بنجاح دون أي مخرجات نصية.</div>';
+        }
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+
+    } else if (_activeLabTab === 'sql') {
+      // 3. SQL Execution via Server API
+      const resultsHost = document.getElementById('codeLabSqlResults');
+      if (resultsHost) {
+        resultsHost.innerHTML = '<div style="color:#94A3B8; text-align:center; padding:30px;">جارٍ تنفيذ استعلام SQL...</div>';
+      }
+
+      const res = await fetch('/api/lab/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: 'sql',
+          code: _codeLabState.sql
+        })
+      });
+
+      const data = await res.json();
+      if (execTimeEl) execTimeEl.textContent = `زمن التنفيذ: ${data.executionTimeMs || 0} ms`;
+
+      if (resultsHost) {
+        if (data.error) {
+          resultsHost.innerHTML = `
+            <div style="background:#450A0A; border:1px solid #7F1D1D; color:#FECACA; padding:16px; border-radius:10px; font-family:monospace; font-size:13px; direction:ltr; text-align:left;">
+              <strong>خطأ في استعلام SQL:</strong><br>${escapeHtml(data.error)}
+            </div>
+          `;
+        } else if (data.columns && data.columns.length > 0) {
+          let tableHtml = `
+            <div style="margin-bottom:10px; font-size:12.5px; color:#38BDF8; font-weight:600;">
+              ${escapeHtml(data.message || '')} (${data.rowCount} صفوف)
+            </div>
+            <table class="codelab-sql-table">
+              <thead>
+                <tr>${data.columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
+              </thead>
+              <tbody>
+                ${data.rows.map(r => `<tr>${r.map(cell => `<td>${escapeHtml(String(cell !== null ? cell : 'NULL'))}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          `;
+          resultsHost.innerHTML = tableHtml;
+        } else {
+          resultsHost.innerHTML = `
+            <div style="background:rgba(0,180,136,0.1); border:1px solid rgba(0,180,136,0.3); color:#34D399; padding:16px; border-radius:10px; font-size:13.5px; text-align:center;">
+              ${escapeHtml(data.message || 'تم تنفيذ أمر SQL بنجاح')}
+            </div>
+          `;
+        }
+      }
+    }
+  } catch (err) {
+    toast('حدث خطأ أثناء تشغيل الكود: ' + err.message);
+  } finally {
+    if (runBtn) {
+      runBtn.style.opacity = '1';
+      runBtn.style.pointerEvents = 'auto';
+    }
+  }
+}
+
+async function triggerCodeLabAiAssist(action) {
+  const box = document.getElementById('codeLabAiResponse');
+  if (!box) return;
+
+  saveCurrentEditorToState();
+
+  let codeToAnalyze = '';
+  let lang = 'javascript';
+
+  if (_activeLabTab === 'web') {
+    codeToAnalyze = `<!-- HTML -->\n${_codeLabState.web.html}\n\n/* CSS */\n${_codeLabState.web.css}\n\n// JavaScript\n${_codeLabState.web.js}`;
+    lang = 'javascript';
+  } else if (_activeLabTab === 'python') {
+    codeToAnalyze = _codeLabState.python;
+    lang = 'python';
+  } else if (_activeLabTab === 'sql') {
+    codeToAnalyze = _codeLabState.sql;
+    lang = 'sql';
+  }
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="display:flex; align-items:center; gap:8px; color:var(--ink-soft); font-size:13px;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+      <span>جارٍ استدعاء مساعد سرمد الذكي لتحليل الكود وتوليد الملاحظات...</span>
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/gemini/lab-assist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        language: lang,
+        code: codeToAnalyze
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) {
+      box.innerHTML = `<div style="color:var(--danger);">${escapeHtml(data.error)}</div>`;
+      return;
+    }
+
+    // Format markdown output
+    const formatted = formatTipMarkdown(data.output || '');
+    box.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--line); padding-bottom:6px;">
+        <span style="font-weight:700; color:var(--emerald); font-size:13px;">تقرير المساعد الذكي (${lang.toUpperCase()})</span>
+        <button type="button" onclick="document.getElementById('codeLabAiResponse').style.display='none'" style="background:none; border:none; color:var(--ink-soft); cursor:pointer; font-size:12px;">إخفاء التقرير</button>
+      </div>
+      <div>${formatted}</div>
+    `;
+  } catch (err) {
+    box.innerHTML = `<div style="color:var(--danger);">تعذر الاتصال بالمساعد الذكي: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function exportActiveCodeLab() {
+  saveCurrentEditorToState();
+  let content = '';
+  let filename = 'code.txt';
+  let mimeType = 'text/plain';
+
+  if (_activeLabTab === 'web') {
+    // Export full bundle as index.html with embedded css and js
+    content = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>Sarmad Web Project</title>
+  <style>
+${_codeLabState.web.css}
+  </style>
+</head>
+<body>
+${_codeLabState.web.html}
+<script>
+${_codeLabState.web.js}
+<\/script>
+</body>
+</html>`;
+    filename = 'sarmad_project.html';
+    mimeType = 'text/html';
+  } else if (_activeLabTab === 'python') {
+    content = _codeLabState.python;
+    filename = 'sarmad_script.py';
+    mimeType = 'text/x-python';
+  } else if (_activeLabTab === 'sql') {
+    content = _codeLabState.sql;
+    filename = 'sarmad_queries.sql';
+    mimeType = 'text/sql';
+  }
+
+  const blob = new Blob([content], { type: mimeType + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`تم تصدير الملف (${filename}) بنجاح`);
+}
+
+/* =====================================================================
    INIT
    ===================================================================== */
 document.getElementById('footYear').textContent = `© ${new Date().getFullYear()} سرمد`;
@@ -5310,6 +7519,10 @@ initCookieConsent();
 initCustomSelects();
 initTwoFactorModal();
 initAiFab();
+initDailyTips();
+initKeyboardShortcuts();
+initCommandPalette();
+initShortcutsGuide();
 // Login is now required to see anything, so the very first render must
 // wait for Firebase to finish restoring a persisted session — otherwise a
 // returning, already-logged-in student would see a flash of the

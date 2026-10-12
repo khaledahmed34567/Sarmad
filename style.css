@@ -775,4 +775,737 @@ p, .hint, li, .info span, .info h4, .info p, .kicker, blockquote{ white-space: p
 .ai-drawer-input-form button{width:42px; height:42px; border-radius:12px; border:none; background:var(--emerald); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .15s ease;}
 .ai-drawer-input-form button:hover{transform:scale(1.05);}
 
+/* Navbar Action Pills (AI & Daily Tip) */
+.nav-action-pill{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:all .18s ease;}
+.nav-action-pill:hover{background:var(--surface-2); border-color:var(--emerald); color:var(--emerald);}
+.nav-action-pill.ai-nav-pill{background:linear-gradient(135deg, rgba(21,95,219,.08), rgba(0,180,136,.1)); border-color:rgba(0,180,136,.3); color:var(--emerald);}
+.nav-action-pill.ai-nav-pill:hover{background:linear-gradient(135deg, #155FDB, #00B488); color:#fff; border-color:transparent;}
+
+/* Daily Programming Tip Styles */
+.daily-tip-modal{background:var(--surface); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow-lift); overflow:hidden;}
+.tip-icon-badge{width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg, #FEF3C7, #FDE68A); color:#D97706; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.tip-date-badge{font-size:11px; font-weight:600; color:#D97706; background:#FEF3C7; padding:2px 8px; border-radius:999px;}
+.daily-tip-categories{display:flex; gap:6px; padding:12px 0 8px; overflow-x:auto; scrollbar-width:none;}
+.daily-tip-categories::-webkit-scrollbar{display:none;}
+.tip-cat-chip{display:inline-flex; align-items:center; padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:var(--canvas); color:var(--ink-soft); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; white-space:nowrap; transition:all .15s ease;}
+.tip-cat-chip:hover{background:var(--surface-2); color:var(--ink);}
+.tip-cat-chip.active{background:var(--ink); color:#fff; border-color:var(--ink);}
+.daily-tip-content-box{background:var(--canvas); border:1px solid var(--line); border-radius:18px; padding:18px 20px; margin:10px 0; max-height:360px; overflow-y:auto;}
+.tip-meta-bar{display:flex; align-items:center; gap:8px; margin-bottom:10px;}
+.tip-cat-tag{font-size:11.5px; font-weight:700; color:var(--emerald); background:rgba(0,180,136,.1); padding:3px 10px; border-radius:6px;}
+.tip-level-tag{font-size:11.5px; color:var(--ink-soft); background:var(--surface); border:1px solid var(--line); padding:3px 8px; border-radius:6px;}
+.tip-title{font-size:16px; font-weight:700; color:var(--ink); margin:0 0 10px; font-family:'AppTitles',sans-serif; line-height:1.45;}
+.tip-body{font-size:13.5px; color:var(--ink); line-height:1.7;}
+.tip-body pre{background:#0F172A; color:#E2E8F0; padding:12px 14px; border-radius:10px; overflow-x:auto; font-family:monospace; direction:ltr; text-align:left; font-size:12.5px; margin:10px 0;}
+.tip-body code{font-family:monospace; font-size:12.5px;}
+.tip-body p{margin:0 0 8px;}
+.daily-tip-actions{padding:10px 0; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line);}
+.daily-tip-prefs-section{margin-top:10px;}
+.daily-tip-prefs-header{display:flex; justify-content:space-between; align-items:center; padding:8px 4px; cursor:pointer;}
+.daily-tip-prefs-body{padding:12px; background:var(--canvas); border-radius:12px; border:1px solid var(--line); margin-top:6px; display:block;}
+
+/* =====================================================================
+   GLOBAL KEYBOARD SHORTCUTS & COMMAND PALETTE (Ctrl+K, Ctrl+/)
+   ===================================================================== */
+kbd, .kbd-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size:11px;
+  font-weight:600;
+  line-height:1;
+  padding:3px 6px;
+  border-radius:6px;
+  background:var(--canvas);
+  color:var(--ink-soft);
+  border:1px solid var(--line);
+  box-shadow:0 1px 0 rgba(0,0,0,0.08);
+  direction:ltr;
+}
+.nav-action-pill.palette-trigger-pill{
+  background:var(--canvas);
+  border-color:var(--line);
+  padding:5px 10px;
+  color:var(--ink-soft);
+}
+.nav-action-pill.palette-trigger-pill:hover{
+  border-color:var(--emerald);
+  color:var(--ink);
+  background:var(--surface);
+}
+.nav-action-pill.code-nav-pill{
+  background:linear-gradient(135deg, rgba(2,132,199,0.08), rgba(14,165,233,0.12));
+  border-color:rgba(2,132,199,0.3);
+  color:#0284C7;
+}
+.nav-action-pill.code-nav-pill:hover{
+  background:#0284C7;
+  color:#fff;
+  border-color:transparent;
+}
+
+/* Command Palette Modal */
+.command-palette-modal{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:20px;
+  width:100%;
+  max-width:640px;
+  box-shadow:0 24px 48px -12px rgba(11,19,43,0.35);
+  overflow:hidden;
+  animation:palSlideIn .18s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes palSlideIn{
+  from{opacity:0; transform:scale(0.96) translateY(-8px);}
+  to{opacity:1; transform:scale(1) translateY(0);}
+}
+.command-palette-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:var(--surface);
+}
+.command-palette-search-icon{
+  color:var(--ink-soft);
+  display:flex;
+  align-items:center;
+}
+.command-palette-head input{
+  flex:1;
+  border:none;
+  background:transparent;
+  font-size:15px;
+  color:var(--ink);
+  font-family:inherit;
+  outline:none;
+}
+.command-palette-filters{
+  display:flex;
+  gap:6px;
+  padding:8px 14px;
+  background:var(--canvas);
+  border-bottom:1px solid var(--line);
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.palette-filter-chip{
+  padding:4px 10px;
+  border-radius:8px;
+  border:1px solid transparent;
+  background:transparent;
+  color:var(--ink-soft);
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:inherit;
+  white-space:nowrap;
+  transition:all .15s ease;
+}
+.palette-filter-chip:hover{
+  background:var(--surface);
+  color:var(--ink);
+}
+.palette-filter-chip.active{
+  background:var(--surface);
+  color:var(--ink);
+  border-color:var(--line);
+  box-shadow:0 1px 2px rgba(0,0,0,0.04);
+}
+.command-palette-results{
+  max-height:360px;
+  overflow-y:auto;
+  padding:8px;
+}
+.palette-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:all .12s ease;
+  color:var(--ink);
+  user-select:none;
+}
+.palette-item:hover, .palette-item.selected{
+  background:var(--surface-2);
+}
+.palette-item-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+.palette-item-icon{
+  width:32px;
+  height:32px;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--canvas);
+  color:var(--ink-soft);
+  flex-shrink:0;
+  border:1px solid var(--line);
+}
+.palette-item.selected .palette-item-icon{
+  background:var(--emerald);
+  color:#fff;
+  border-color:var(--emerald);
+}
+.palette-item-text{
+  min-width:0;
+}
+.palette-item-title{
+  font-size:13.5px;
+  font-weight:600;
+  color:var(--ink);
+  line-height:1.3;
+}
+.palette-item-sub{
+  font-size:11.5px;
+  color:var(--ink-soft);
+  line-height:1.3;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.palette-item-right{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-shrink:0;
+}
+.command-palette-footer{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px 16px;
+  background:var(--canvas);
+  border-top:1px solid var(--line);
+  font-size:12px;
+  color:var(--ink-soft);
+}
+.palette-legend-items{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+/* Shortcuts Guide Modal */
+.shortcuts-head-icon{
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  background:rgba(21,95,219,0.1);
+  color:#155FDB;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+}
+.shortcuts-guide-body{
+  padding:14px 0;
+  max-height:460px;
+  overflow-y:auto;
+}
+.shortcut-group{
+  margin-bottom:20px;
+}
+.shortcut-group-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13.5px;
+  font-weight:700;
+  color:var(--ink);
+  margin:0 0 10px;
+  padding-bottom:6px;
+  border-bottom:1px solid var(--line);
+}
+.shortcut-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.shortcut-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px;
+  background:var(--canvas);
+  border-radius:10px;
+  border:1px solid var(--line);
+  font-size:13px;
+}
+.shortcut-label{
+  color:var(--ink);
+  font-weight:500;
+}
+.shortcut-keys{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.shortcuts-guide-footer{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding-top:14px;
+  border-top:1px solid var(--line);
+}
+
+/* =====================================================================
+   INTERACTIVE CODING LABS (معامل سرمد البرمجية)
+   ===================================================================== */
+.codelab-shell{
+  max-width:1400px;
+  margin:0 auto;
+  padding:20px 16px 40px;
+}
+.codelab-hero{
+  margin-bottom:18px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:14px;
+}
+.codelab-title-area h1{
+  font-family:'AppTitles',sans-serif;
+  font-size:24px;
+  margin:0 0 6px;
+  color:var(--ink);
+}
+.codelab-title-area p{
+  font-size:13.5px;
+  color:var(--ink-soft);
+  margin:0;
+  max-width:680px;
+  line-height:1.5;
+}
+.codelab-shortcuts-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 12px;
+  border-radius:10px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  font-size:12px;
+  color:var(--ink-soft);
+  cursor:pointer;
+}
+.codelab-shortcuts-badge:hover{
+  border-color:var(--emerald);
+  color:var(--ink);
+}
+
+/* Lab Nav Switcher (Web, Python, SQL) */
+.codelab-nav-tabs{
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+  border-bottom:1px solid var(--line);
+  padding-bottom:10px;
+  overflow-x:auto;
+}
+.codelab-tab-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 16px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  background:var(--surface);
+  color:var(--ink-soft);
+  font-size:13.5px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:inherit;
+  white-space:nowrap;
+  transition:all .15s ease;
+}
+.codelab-tab-btn:hover{
+  background:var(--surface-2);
+  color:var(--ink);
+}
+.codelab-tab-btn.active{
+  background:var(--ink);
+  color:#fff;
+  border-color:var(--ink);
+  box-shadow:0 2px 6px rgba(0,0,0,0.12);
+}
+.codelab-tab-btn .lab-count-badge{
+  font-size:11px;
+  background:rgba(255,255,255,0.2);
+  padding:2px 6px;
+  border-radius:999px;
+}
+.codelab-tab-btn:not(.active) .lab-count-badge{
+  background:var(--canvas);
+  color:var(--ink-soft);
+}
+
+/* Lab Workspace Toolbar */
+.codelab-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 16px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:16px 16px 0 0;
+  flex-wrap:wrap;
+}
+.codelab-toolbar-left, .codelab-toolbar-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.codelab-template-select{
+  padding:6px 12px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:var(--canvas);
+  color:var(--ink);
+  font-size:13px;
+  font-family:inherit;
+  outline:none;
+}
+.codelab-action-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 14px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .15s ease;
+  border:1px solid var(--line);
+  background:var(--canvas);
+  color:var(--ink);
+}
+.codelab-action-btn:hover{
+  background:var(--surface-2);
+}
+.codelab-action-btn.run-btn{
+  background:var(--emerald);
+  color:#fff;
+  border-color:var(--emerald);
+  box-shadow:0 2px 8px rgba(0,180,136,0.25);
+}
+.codelab-action-btn.run-btn:hover{
+  background:#009b75;
+}
+.codelab-action-btn.ai-btn{
+  background:linear-gradient(135deg, #155FDB, #00B488);
+  color:#fff;
+  border-color:transparent;
+}
+.codelab-action-btn.ai-btn:hover{
+  opacity:0.95;
+}
+
+/* Main Split Workspace */
+.codelab-workspace{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  border:1px solid var(--line);
+  border-top:none;
+  border-radius:0 0 16px 16px;
+  overflow:hidden;
+  background:#0F172A;
+  min-height:560px;
+}
+@media(max-width:960px){
+  .codelab-workspace{
+    grid-template-columns:1fr;
+  }
+}
+
+/* Left Pane: Code Editor */
+.codelab-editor-pane{
+  display:flex;
+  flex-direction:column;
+  border-left:1px solid #1E293B;
+  background:#0B132B;
+}
+.codelab-file-tabs{
+  display:flex;
+  align-items:center;
+  background:#090F20;
+  border-bottom:1px solid #1E293B;
+  padding:0 8px;
+  overflow-x:auto;
+}
+.codelab-file-tab{
+  padding:8px 14px;
+  font-family:ui-monospace, monospace;
+  font-size:12.5px;
+  color:#94A3B8;
+  background:transparent;
+  border:none;
+  border-bottom:2px solid transparent;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  transition:all .15s ease;
+}
+.codelab-file-tab:hover{
+  color:#E2E8F0;
+}
+.codelab-file-tab.active{
+  color:#38BDF8;
+  border-bottom-color:#38BDF8;
+  background:rgba(56,189,248,0.06);
+}
+.codelab-editor-wrap{
+  flex:1;
+  display:flex;
+  position:relative;
+}
+.codelab-line-numbers{
+  width:44px;
+  padding:14px 6px 14px 0;
+  color:#475569;
+  font-family:ui-monospace, monospace;
+  font-size:13px;
+  line-height:22px;
+  text-align:right;
+  user-select:none;
+  background:#090F20;
+  border-left:1px solid #1E293B;
+  overflow:hidden;
+}
+.codelab-textarea{
+  flex:1;
+  padding:14px 16px;
+  background:transparent;
+  border:none;
+  outline:none;
+  resize:none;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size:13.5px;
+  line-height:22px;
+  color:#E2E8F0;
+  tab-size:2;
+  direction:ltr;
+  text-align:left;
+  white-space:pre;
+  overflow:auto;
+}
+.codelab-editor-footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:6px 14px;
+  background:#090F20;
+  border-top:1px solid #1E293B;
+  font-size:11.5px;
+  color:#64748B;
+  font-family:ui-monospace, monospace;
+}
+
+/* Right Pane: Live Output & Console */
+.codelab-output-pane{
+  display:flex;
+  flex-direction:column;
+  background:#0B132B;
+}
+.codelab-output-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 14px;
+  background:#090F20;
+  border-bottom:1px solid #1E293B;
+  color:#94A3B8;
+  font-size:12px;
+  font-weight:600;
+}
+.codelab-live-frame{
+  width:100%;
+  height:100%;
+  min-height:340px;
+  border:none;
+  background:#fff;
+}
+
+/* Terminal Console View (for Python & Web Logs) */
+.codelab-terminal{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background:#090F20;
+  padding:12px 16px;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size:13px;
+  line-height:1.6;
+  color:#CBD5E1;
+  overflow-y:auto;
+  direction:ltr;
+  text-align:left;
+}
+.codelab-terminal-line{
+  margin-bottom:4px;
+  word-break:break-all;
+}
+.codelab-terminal-line.out{
+  color:#38BDF8;
+}
+.codelab-terminal-line.err{
+  color:#F87171;
+}
+.codelab-terminal-line.info{
+  color:#34D399;
+}
+.codelab-terminal-line.dim{
+  color:#64748B;
+}
+
+/* SQL Result Table View */
+.codelab-sql-results-wrap{
+  flex:1;
+  overflow:auto;
+  padding:14px;
+  background:#090F20;
+}
+.codelab-sql-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+  direction:rtl;
+  text-align:right;
+  color:#E2E8F0;
+  border:1px solid #1E293B;
+}
+.codelab-sql-table th{
+  background:#1E293B;
+  color:#38BDF8;
+  padding:8px 12px;
+  border:1px solid #334155;
+  font-weight:600;
+  position:sticky;
+  top:0;
+}
+.codelab-sql-table td{
+  padding:8px 12px;
+  border:1px solid #1E293B;
+  background:#0B132B;
+}
+.codelab-sql-table tr:nth-child(even) td{
+  background:#0F172A;
+}
+
+/* SQL Schema Explorer Box */
+.codelab-schema-box{
+  margin-top:12px;
+  padding:12px 14px;
+  background:#0B132B;
+  border:1px solid #1E293B;
+  border-radius:10px;
+  color:#94A3B8;
+  font-size:12px;
+}
+.codelab-schema-title{
+  color:#38BDF8;
+  font-weight:700;
+  margin-bottom:6px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+/* AI Lab Assistant Panel */
+.codelab-ai-dock{
+  margin-top:16px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:16px 20px;
+}
+.codelab-ai-dock-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:12px;
+}
+.codelab-ai-dock-title{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:15px;
+  font-weight:700;
+  color:var(--ink);
+}
+.codelab-ai-chips{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.codelab-ai-chip{
+  padding:6px 12px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  background:var(--canvas);
+  color:var(--ink);
+  font-size:12.5px;
+  font-weight:600;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .15s ease;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.codelab-ai-chip:hover{
+  background:var(--surface-2);
+  border-color:var(--emerald);
+  color:var(--emerald);
+}
+.codelab-ai-chip.active{
+  background:var(--emerald);
+  color:#fff;
+  border-color:var(--emerald);
+}
+.codelab-ai-response-box{
+  background:var(--canvas);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px 18px;
+  font-size:13.5px;
+  line-height:1.7;
+  color:var(--ink);
+  max-height:420px;
+  overflow-y:auto;
+}
+.codelab-ai-response-box pre{
+  background:#0B132B;
+  color:#E2E8F0;
+  padding:12px 14px;
+  border-radius:10px;
+  overflow-x:auto;
+  direction:ltr;
+  text-align:left;
+  font-family:monospace;
+  font-size:12.5px;
+  margin:10px 0;
+}
+.codelab-ai-response-box code{
+  font-family:monospace;
+  font-size:12.5px;
+}
+
+
+
 
