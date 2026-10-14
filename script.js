@@ -328,23 +328,46 @@ const session = { user: null }; // { name, email, profileComplete }
 
 function renderNavForUser(){
   const box = document.getElementById('navActions');
+  const deskBox = document.getElementById('desktopNavAuth');
   const notifBtn = document.getElementById('notifBtn');
-  box.querySelectorAll('#loginBtn,#signupBtn,#avatarBtn').forEach(b=>b.remove());
+  if (box) box.innerHTML = '';
+  if (deskBox) deskBox.innerHTML = '';
+
   if (!session.user){
     if (_notifUnsub) { _notifUnsub(); _notifUnsub = null; }
-    notifBtn.style.display = 'none';
-    box.insertAdjacentHTML('beforeend', `<button class="btn btn-ghost btn-sm" id="loginBtn">تسجيل الدخول</button><button class="btn btn-primary btn-sm" id="signupBtn">إنشاء حساب</button>`);
-    document.getElementById('loginBtn').addEventListener('click', ()=>{ openAuth('login'); mobileMenu.classList.remove('open'); });
-    document.getElementById('signupBtn').addEventListener('click', ()=>{ openAuth('signup'); mobileMenu.classList.remove('open'); });
+    if (notifBtn) notifBtn.style.display = 'none';
+
+    if (box) {
+      box.innerHTML = `<button class="btn btn-ghost btn-sm" id="loginBtn">تسجيل الدخول</button><button class="btn btn-primary btn-sm" id="signupBtn">إنشاء حساب</button>`;
+      document.getElementById('loginBtn')?.addEventListener('click', ()=>{ openAuth('login'); mobileMenu.classList.remove('open'); });
+      document.getElementById('signupBtn')?.addEventListener('click', ()=>{ openAuth('signup'); mobileMenu.classList.remove('open'); });
+    }
+
+    if (deskBox) {
+      deskBox.innerHTML = `<button class="btn btn-ghost btn-sm" id="deskLoginBtn" style="min-height:36px; padding:0 14px; font-size:13px;">تسجيل الدخول</button><button class="btn btn-primary btn-sm" id="deskSignupBtn" style="min-height:36px; padding:0 14px; font-size:13px;">إنشاء حساب</button>`;
+      document.getElementById('deskLoginBtn')?.addEventListener('click', ()=>{ openAuth('login'); });
+      document.getElementById('deskSignupBtn')?.addEventListener('click', ()=>{ openAuth('signup'); });
+    }
     return;
   }
-  const btn = document.createElement('button');
-  btn.className = 'avatar-btn'; btn.id = 'avatarBtn';
-  btn.textContent = (session.user.name || '؟').trim().charAt(0);
-  btn.addEventListener('click', ()=> { navigate('dashboard'); mobileMenu.classList.remove('open'); });
-  box.appendChild(btn);
-  notifBtn.style.display = 'flex';
-  notifBtn.innerHTML = `${icon('bell')}<span id="notifBadge" class="notif-badge" style="display:none;"></span>`;
+
+  const createAvatarBtn = (isMobile) => {
+    const btn = document.createElement('button');
+    btn.className = 'avatar-btn';
+    btn.textContent = (session.user.name || '؟').trim().charAt(0);
+    btn.title = session.user.name || 'لوحة التحكم';
+    btn.setAttribute('aria-label', 'الملف الشخصي ولوحة التحكم');
+    btn.addEventListener('click', ()=> { navigate('dashboard'); if (isMobile) mobileMenu.classList.remove('open'); });
+    return btn;
+  };
+
+  if (box) box.appendChild(createAvatarBtn(true));
+  if (deskBox) deskBox.appendChild(createAvatarBtn(false));
+
+  if (notifBtn) {
+    notifBtn.style.display = 'flex';
+    notifBtn.innerHTML = `${icon('bell')}<span id="notifBadge" class="notif-badge" style="display:none;"></span>`;
+  }
   subscribeNotifications();
   requestNotificationPermission();
   bumpStudyStreak();
@@ -546,13 +569,16 @@ const authTitle = document.getElementById('authTitle');
 const loginPanel = document.getElementById('loginPanel');
 const signupPanel = document.getElementById('signupPanel');
 function openAuth(tab){
-  authOverlay.classList.add('open'); setAuthTab(tab||'login');
+  authOverlay.classList.add('open');
+  authOverlay.classList.add('active');
+  setAuthTab(tab||'login');
   // push a history entry so the phone's back button closes the modal
   // instead of leaving the page entirely
   history.pushState({ modal:'auth' }, '');
 }
 function closeAuth(){
   authOverlay.classList.remove('open');
+  authOverlay.classList.remove('active');
   if (history.state && history.state.modal==='auth') history.back();
 }
 function setAuthTab(tab){
@@ -611,13 +637,23 @@ function userIsProfileComplete(u){
   return !!(u && u.full_name && u.phone && u.gender && u.level);
 }
 function sessionFromUserRow(uid, row, emailVerified){
-  return {
+  const sess = {
     uid, name: row.full_name, nameEn: row.full_name_en, email: row.email, phone: row.phone, gender: row.gender,
     level: row.level, avatar: row.avatar_url, referral_code: row.referral_code || genReferralCode(uid),
     profileComplete: userIsProfileComplete(row),
     emailVerified: emailVerified !== false,
     banned: !!row.banned, ban_reason: row.ban_reason || '',
+    twoFactorEnabled: !!row.twoFactorEnabled,
+    github: row.github || null,
+    gemini_api_key: row.gemini_api_key || '',
   };
+  if (row.github) {
+    try { localStorage.setItem('sarmad_github_user', JSON.stringify(row.github)); } catch(_) {}
+  }
+  if (row.gemini_api_key) {
+    try { localStorage.setItem('sarmad_gemini_key', row.gemini_api_key); } catch(_) {}
+  }
+  return sess;
 }
 async function loadUserDoc(uid){
   const row = await DB.get('Users', uid);
@@ -3893,16 +3929,168 @@ async function directDownloadAccreditation(certId, lang, kind){
 async function loadDashPanel(tab){
   const panel = document.getElementById('dashPanel');
   if (tab==='progress'){
-    const [courses, lectures, tasks, progress] = await Promise.all([DB.listAll('Courses'), DB.listAll('Lectures'), DB.listAll('Tasks'), getUserProgress()]);
+    const [tracks, courses, lectures, tasks, progress] = await Promise.all([
+      DB.listAll('Tracks'),
+      DB.listAll('Courses'),
+      DB.listAll('Lectures'),
+      DB.listAll('Tasks'),
+      getUserProgress()
+    ]);
     const doneIds = new Set(progress.filter(p=>String(p.completed).toUpperCase()==='TRUE').map(p=>String(p.task_id)));
-    panel.innerHTML = courses.length ? courses.map(c=>{
-      const cLectures = lectures.filter(l=>String(l.course_id)===String(c.id));
-      const cTasks = tasks.filter(t=>cLectures.some(l=>String(l.id)===String(t.lecture_id)));
-      const pct = cTasks.length ? Math.round(100*cTasks.filter(t=>doneIds.has(String(t.id))).length/cTasks.length) : 0;
-      return `<div class="list-item" onclick="navigate('course/${c.id}')">
-        <div class="info"><h4>${escapeHtml(c.title_ar||'')}</h4><div class="progress-bar"><div style="width:${pct}%"></div></div></div>
-        <div class="status-icon">${pct}%</div></div>`;
-    }).join('') : emptyState('لا توجد دورات بعد','تصفّح الدورات وابدأ التعلّم');
+
+    // 1. Calculate Track-level progress
+    const trackProgressList = tracks.map(tr => {
+      const trCourses = courses.filter(c => {
+        if (tr.course_ids && Array.isArray(tr.course_ids)) {
+          return tr.course_ids.map(String).includes(String(c.id));
+        }
+        return String(c.track_id) === String(tr.id);
+      });
+      const trLectures = lectures.filter(l => trCourses.some(c => String(c.id) === String(l.course_id)));
+      const trTasks = tasks.filter(t => trLectures.some(l => String(l.id) === String(t.lecture_id)));
+      const trDoneTasks = trTasks.filter(t => doneIds.has(String(t.id)));
+      const pct = trTasks.length ? Math.round((trDoneTasks.length / trTasks.length) * 100) : 0;
+
+      const finishedCourses = trCourses.filter(c => {
+        const cLects = lectures.filter(l => String(l.course_id) === String(c.id));
+        const cTsks = tasks.filter(t => cLects.some(l => String(l.id) === String(t.lecture_id)));
+        return cTsks.length > 0 && cTsks.every(t => doneIds.has(String(t.id)));
+      }).length;
+
+      return {
+        track: tr,
+        courses: trCourses,
+        totalTasks: trTasks.length,
+        doneTasks: trDoneTasks.length,
+        pct,
+        finishedCourses
+      };
+    });
+
+    const tracksHtml = trackProgressList.length ? `
+      <div style="margin-bottom:28px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="font-family:'AppTitles'; font-size:18px; margin:0; display:flex; align-items:center; gap:8px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+            <span>المسارات التعليمية المعتمدة ونسبة الإنجاز في كل مادة</span>
+          </h3>
+          <span style="font-size:12px; color:var(--ink-soft);">${trackProgressList.length} مسارات مسجلة</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          ${trackProgressList.map(item => {
+            const tr = item.track;
+            const badgeClass = item.pct === 100 ? 'done' : (item.pct > 0 ? 'in-progress' : 'start');
+            const badgeText = item.pct === 100 ? 'مكتمل بنجاح 🏆 100%' : (item.pct > 0 ? `قيد التقدّم ⚡ ${item.pct}%` : 'لم يبدأ بعد 🚀 0%');
+            return `
+              <div class="track-progress-card" style="border:1.5px solid var(--line); border-radius:16px; padding:22px; background:var(--surface);">
+                <div class="track-progress-head" style="margin-bottom:12px;">
+                  <div class="track-progress-title" style="font-size:17px; display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:24px;">🎓</span>
+                    <div>
+                      <div style="font-weight:700; color:var(--ink);">${escapeHtml(tr.name_ar || tr.name || 'مسار تعليمي')}</div>
+                      <div style="font-size:12px; color:var(--ink-soft); font-weight:normal; margin-top:2px;">مسار احترافي معتمد يشتمل على ${item.courses.length} مواد تدريبية متخصصة</div>
+                    </div>
+                  </div>
+                  <span class="track-progress-badge ${badgeClass}" style="font-size:13px; font-weight:700; padding:5px 12px;">${badgeText}</span>
+                </div>
+
+                <!-- Prominent Visual Track Progress Bar -->
+                <div style="margin:14px 0 10px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; margin-bottom:6px;">
+                    <span style="font-weight:600; color:var(--ink);">نسبة الإنجاز الإجمالية في المسار:</span>
+                    <strong style="color:${item.pct === 100 ? 'var(--emerald)' : (item.pct > 0 ? '#0284C7' : 'var(--ink-soft)')}; font-size:14px;">${item.pct}%</strong>
+                  </div>
+                  <div class="track-progress-bar-wrap" style="height:14px; border-radius:999px; background:var(--line); box-shadow:inset 0 1px 3px rgba(0,0,0,0.1); margin:0; overflow:hidden;">
+                    <div class="track-progress-bar-fill ${item.pct === 100 ? 'complete' : ''}" style="width:${item.pct}%; height:100%; border-radius:999px; background:linear-gradient(90deg, #10B981, #059669); transition:width .8s cubic-bezier(.34,1.56,.64,1); box-shadow:${item.pct > 0 ? '0 0 12px rgba(16,185,129,0.45)' : 'none'};"></div>
+                  </div>
+                </div>
+
+                <div class="track-progress-meta" style="margin-bottom:16px;">
+                  <span>أنجزت <strong>${item.doneTasks}</strong> من أصل <strong>${item.totalTasks}</strong> مهام وتطبيقات</span>
+                  <span><strong>${item.finishedCourses}</strong> من <strong>${item.courses.length}</strong> مواد مكتملة</span>
+                  <button type="button" class="btn btn-primary btn-sm" style="padding:5px 16px; font-size:12.5px; border-radius:8px;" onclick="navigate('track/${tr.id}')">
+                    ${item.pct > 0 ? 'متابعة المسار' : 'بدء المسار'}
+                  </button>
+                </div>
+
+                <!-- Individual Subject Breakdown inside Track -->
+                ${item.courses.length ? `
+                  <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--line);">
+                    <div style="font-size:12.5px; font-weight:700; color:var(--ink); margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                      <span>مدى إنجاز الطالب في كل مادة (${item.courses.length} مواد):</span>
+                      <span style="font-size:11.5px; color:var(--ink-soft); font-weight:normal;">اضغط على أي مادة للانتقال إليها مباشرة</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                      ${item.courses.map(c => {
+                        const cLects = lectures.filter(l => String(l.course_id) === String(c.id));
+                        const cTsks = tasks.filter(t => cLects.some(l => String(l.id) === String(t.lecture_id)));
+                        const cDone = cTsks.filter(t => doneIds.has(String(t.id))).length;
+                        const cPct = cTsks.length ? Math.round(100 * cDone / cTsks.length) : 0;
+                        return `
+                          <div style="background:var(--canvas); border:1px solid var(--line); border-radius:10px; padding:10px 14px; cursor:pointer; transition:all .15s ease;" onclick="navigate('course/${c.id}')" onmouseover="this.style.borderColor='var(--emerald)'" onmouseout="this.style.borderColor='var(--line)'">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                              <span style="font-size:13.5px; font-weight:600; color:var(--ink);">${escapeHtml(c.title_ar || c.title || 'مادة دراسية')}</span>
+                              <span style="font-size:12.5px; font-weight:700; color:${cPct === 100 ? 'var(--emerald)' : (cPct > 0 ? '#0284C7' : 'var(--ink-soft)')};">${cPct}%</span>
+                            </div>
+                            <!-- Prominent Subject Bar -->
+                            <div class="track-progress-bar-wrap" style="height:7px; margin:5px 0 6px; border-radius:999px; background:var(--line);">
+                              <div class="track-progress-bar-fill ${cPct === 100 ? 'complete' : ''}" style="width:${cPct}%; height:100%; border-radius:999px;"></div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:11.5px; color:var(--ink-soft);">
+                              <span>${cDone} من ${cTsks.length} مهام وتطبيقات منجزة</span>
+                              <span>${cLects.length} دروس</span>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    // 2. Individual courses breakdown
+    const coursesHtml = courses.length ? `
+      <div>
+        <h3 style="font-family:'AppTitles'; font-size:16px; margin:20px 0 12px; display:flex; align-items:center; gap:8px;">
+          ${icon('book')}
+          <span>المقررات والمواد الدراسية الفردية</span>
+        </h3>
+        <div class="list" style="display:flex; flex-direction:column; gap:10px;">
+          ${courses.map(c => {
+            const cLectures = lectures.filter(l=>String(l.course_id)===String(c.id));
+            const cTasks = tasks.filter(t=>cLectures.some(l=>String(l.id)===String(t.lecture_id)));
+            const doneTasks = cTasks.filter(t=>doneIds.has(String(t.id))).length;
+            const pct = cTasks.length ? Math.round(100*doneTasks/cTasks.length) : 0;
+            return `
+              <div class="list-item" style="padding:14px 18px; border-radius:12px;" onclick="navigate('course/${c.id}')">
+                <div class="info" style="flex:1;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <h4 style="margin:0; font-size:14.5px;">${escapeHtml(c.title_ar||'')}</h4>
+                    <span style="font-weight:700; font-size:13px; color:${pct===100?'var(--emerald)':'var(--ink-soft)'};">${pct}%</span>
+                  </div>
+                  <!-- Course Progress Bar -->
+                  <div class="track-progress-bar-wrap" style="height:8px; margin:6px 0;">
+                    <div class="track-progress-bar-fill ${pct===100?'complete':''}" style="width:${pct}%;"></div>
+                  </div>
+                  <div style="font-size:12px; color:var(--ink-soft); display:flex; justify-content:space-between;">
+                    <span>${doneTasks} من ${cTasks.length} مهمة منجزة</span>
+                    <span>${cLectures.length} درس</span>
+                  </div>
+                </div>
+                <div class="status-icon" style="margin-right:12px;">${icon('chevron')}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : emptyState('لا توجد دورات بعد','تصفّح الدورات وابدأ التعلّم');
+
+    panel.innerHTML = tracksHtml + coursesHtml;
   } else if (tab==='bookmarks'){
     const [bookmarks, tracks, courses] = await Promise.all([
       session.user ? DB.listAll('Bookmarks', 'user_id', session.user.uid) : [],
@@ -3993,10 +4181,107 @@ async function loadDashPanel(tab){
   } else if (tab==='profile'){
     const userDoc = session.user?.uid ? await DB.get('Users', session.user.uid) : null;
     const is2faActive = !!(userDoc?.twoFactorEnabled || session.user?.twoFactorEnabled);
+    const ghUser = userDoc?.github || session.user?.github || getStoredGithubUser();
+    const storedGeminiKey = getStoredGeminiKey();
+
     panel.innerHTML = `
-      <div class="field"><label>الاسم</label><input type="text" id="dpName" value="${escapeHtml(session.user.name||'')}"></div>
+      <div class="field"><label>الاسم الكامل</label><input type="text" id="dpName" value="${escapeHtml(session.user.name||'')}"></div>
       <div class="field"><label>البريد الإلكتروني</label><input type="email" value="${escapeHtml(session.user.email||'')}" disabled></div>
       <div class="field"><label>رقم الهاتف / الواتساب</label><input type="tel" id="dpPhone" value="${escapeHtml(session.user.phone||'')}"></div>
+
+      <!-- ============ GITHUB ACCOUNT LINKING SECTION ============ -->
+      <div class="panel" style="margin:20px 0; border:1px solid var(--line); border-radius:14px; padding:18px; background:var(--canvas);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            <h4 style="margin:0; font-size:15px; font-weight:700;">ربط حساب GitHub بالمستخدم</h4>
+          </div>
+          ${ghUser ? `<span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-size:12px;">مرتبط بنجاح ✅</span>` : `<span class="badge" style="background:var(--surface); color:var(--ink-soft); border:1px solid var(--line); font-size:12px;">غير مرتبط</span>`}
+        </div>
+
+        <p style="font-size:12.5px; color:var(--ink-soft); line-height:1.6; margin-top:0; margin-bottom:14px;">
+          اربط حسابك في GitHub لتتمكن من استعراض ومزامنة مشاريعك ومستودعاتك البرمجية مباشرة داخل "المعامل البرمجية" لتجربتها وممارستها بسلاسة وسرعة.
+        </p>
+
+        ${ghUser ? `
+          <!-- Connected GitHub Profile Card -->
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <img src="${escapeHtml(ghUser.avatar_url || '')}" alt="" style="width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--line);">
+                <div>
+                  <div style="font-weight:700; font-size:14px; color:var(--ink);">${escapeHtml(ghUser.name || ghUser.login)}</div>
+                  <div style="font-size:12px; color:var(--ink-soft); direction:ltr; text-align:right;">@${escapeHtml(ghUser.login)}</div>
+                  ${ghUser.bio ? `<div style="font-size:11.5px; color:var(--ink-soft); margin-top:3px;">${escapeHtml(ghUser.bio)}</div>` : ''}
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <a href="${escapeHtml(ghUser.html_url || `https://github.com/${ghUser.login}`)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="font-size:11.5px; border:1px solid var(--line); padding:4px 10px;">
+                  عرض على GitHub ↗
+                </a>
+                <button type="button" class="btn btn-ghost btn-sm" id="btnRefreshGhAccount" style="font-size:11.5px; border:1px solid var(--line); padding:4px 10px;">
+                  تحديث 🔄
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" id="btnUnlinkGhAccount" style="font-size:11.5px; color:var(--danger); border:1px solid rgba(239,68,68,0.3); padding:4px 10px;">
+                  إلغاء الربط ✕
+                </button>
+              </div>
+            </div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <span style="font-size:12px; color:var(--ink-soft);">المستودعات العامة: <strong>${ghUser.public_repos || 0}</strong></span>
+              <button type="button" class="btn btn-primary btn-sm" id="btnOpenMyReposInLab" style="font-size:12px; padding:5px 14px; display:inline-flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <span>استعراض مشاريعي في المعمل البرمجي 💻</span>
+              </button>
+            </div>
+          </div>
+        ` : `
+          <!-- Connect GitHub Form -->
+          <div style="background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:14px;">
+            <div class="field" style="margin-bottom:10px;">
+              <label style="font-size:12.5px;">اسم مستخدم GitHub (GitHub Username)</label>
+              <input type="text" id="ghLinkUsernameInput" placeholder="مثال: octocat أو اسم حسابك..." style="font-size:13px; direction:ltr; text-align:left;">
+            </div>
+            <div class="field" style="margin-bottom:12px;">
+              <label style="font-size:12.5px; display:flex; justify-content:space-between;">
+                <span>رمز الوصول الشخصي (Personal Access Token - اختياري)</span>
+                <span style="color:var(--ink-soft); font-size:11px;">للمستودعات الخاصة وزيادة حد الطلبات</span>
+              </label>
+              <input type="password" id="ghLinkTokenInput" placeholder="ghp_... (اختياري)" style="font-size:13px; direction:ltr; text-align:left; font-family:monospace;">
+            </div>
+            <div id="ghLinkFeedback" style="display:none; font-size:12.5px; margin-bottom:10px; padding:8px 12px; border-radius:8px;"></div>
+            <button type="button" class="btn btn-primary btn-sm" id="btnLinkGhAccount" style="padding:6px 16px; font-size:12.5px;">
+              ربط الحساب والتحقق الآن 🚀
+            </button>
+          </div>
+        `}
+      </div>
+
+      <!-- ============ GEMINI API KEY CONFIGURATION CARD ============ -->
+      <div class="panel" style="margin:20px 0; border:1px solid var(--line); border-radius:14px; padding:18px; background:var(--canvas);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2"><path d="M21 2l-2 2m-2-2l2 2m-2 2l2-2m-7 7l-7 7a2.828 2.828 0 1 1-4-4l7-7m2 2l4-4m-2 2l2-2m-2-2l2 2"/></svg>
+            <h4 style="margin:0; font-size:15px; font-weight:700;">مفتاح Gemini API الذكي (Google AI Studio)</h4>
+          </div>
+          ${storedGeminiKey ? `
+            <span class="badge" style="background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; font-size:12px;">مفتاح مخصص محفوظ ✅</span>
+          ` : `
+            <span class="badge" style="background:var(--surface); color:var(--ink-soft); border:1px solid var(--line); font-size:12px;">المفتاح الافتراضي نشط</span>
+          `}
+        </div>
+        <p style="font-size:12.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 12px;">
+          احفظ مفتاح API الخاص بك ليعمل دائماً في الشرح والتحليل البرمجي وتوليد الخطط الدراسية والمحادثات الصوتية دون أي انقطاع.
+        </p>
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+          <span style="font-size:12px; color:var(--ink-soft);">
+            ${storedGeminiKey ? `المفتاح المحفوظ: <code style="font-family:monospace; background:var(--surface); padding:2px 6px; border-radius:6px;">${storedGeminiKey.slice(0,6)}...${storedGeminiKey.slice(-4)}</code>` : 'يمكنك إضافة مفتاحك الشخصي للحصول على أقصى أداء'}
+          </span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnManageGeminiKeyInProfile" style="border:1px solid var(--line); font-size:12px; padding:5px 14px;">
+            إدارة وإعداد المفتاح 🔑
+          </button>
+        </div>
+      </div>
 
       <!-- 2FA Security Setting -->
       <div class="panel" style="margin:20px 0; border:1px solid var(--line); border-radius:14px; padding:16px; background:var(--canvas);">
@@ -4019,6 +4304,97 @@ async function loadDashPanel(tab){
 
       <button class="btn btn-primary" id="saveProfileBtn">حفظ التغييرات</button>
       <button class="btn btn-ghost" id="logoutBtn" style="margin-top:10px;">تسجيل الخروج</button>`;
+
+    // Gemini modal trigger from profile
+    document.getElementById('btnManageGeminiKeyInProfile')?.addEventListener('click', openGeminiKeyModal);
+
+    // GitHub Account Action Handlers
+    document.getElementById('btnOpenMyReposInLab')?.addEventListener('click', () => {
+      navigate('code-lab');
+      setTimeout(() => {
+        openGithubLabModal(ghUser?.login);
+      }, 250);
+    });
+
+    document.getElementById('btnRefreshGhAccount')?.addEventListener('click', async () => {
+      if (!ghUser?.login) return;
+      toast('جارٍ تحديث بيانات حساب GitHub...');
+      await fetchAndRenderGithubRepos(ghUser.login);
+      loadDashPanel('profile');
+      toast('تم تحديث بيانات حساب GitHub بنجاح');
+    });
+
+    document.getElementById('btnUnlinkGhAccount')?.addEventListener('click', async () => {
+      if (!confirm('هل ترغب بإلغاء ربط حساب GitHub هذا؟')) return;
+      clearStoredGithubUser();
+      loadDashPanel('profile');
+      toast('تم إلغاء ربط حساب GitHub');
+    });
+
+    document.getElementById('btnLinkGhAccount')?.addEventListener('click', async () => {
+      const uInput = document.getElementById('ghLinkUsernameInput');
+      const tInput = document.getElementById('ghLinkTokenInput');
+      const feedback = document.getElementById('ghLinkFeedback');
+      const linkBtn = document.getElementById('btnLinkGhAccount');
+
+      const username = uInput ? uInput.value.trim() : '';
+      const token = tInput ? tInput.value.trim() : '';
+
+      if (!username) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239,68,68,0.1)';
+          feedback.style.color = 'var(--danger)';
+          feedback.textContent = 'يرجى إدخال اسم مستخدم GitHub.';
+        }
+        return;
+      }
+
+      const origText = linkBtn.innerHTML;
+      linkBtn.disabled = true;
+      linkBtn.innerHTML = '<span>جارٍ التحقق من الحساب والربط...</span>';
+      if (feedback) feedback.style.display = 'none';
+
+      try {
+        const headers = token ? { 'x-github-token': token } : {};
+        const res = await fetch(`/api/github/user/${encodeURIComponent(username)}`, { headers });
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.style.background = 'rgba(239,68,68,0.1)';
+            feedback.style.color = 'var(--danger)';
+            feedback.textContent = data.error || 'لم يتم العثور على حساب GitHub هذا.';
+          }
+          toast('تعذر العثور على الحساب: ' + (data.error || 'خطأ'));
+        } else {
+          const profileData = {
+            login: data.login,
+            name: data.name || data.login,
+            avatar_url: data.avatar_url,
+            bio: data.bio || '',
+            public_repos: data.public_repos || 0,
+            html_url: data.html_url,
+            token: token || ''
+          };
+          saveStoredGithubUser(profileData);
+          toast(`تم ربط حساب GitHub (@${data.login}) بنجاح! 🎉`);
+          loadDashPanel('profile');
+        }
+      } catch (err) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239,68,68,0.1)';
+          feedback.style.color = 'var(--danger)';
+          feedback.textContent = 'حدث خطأ في الاتصال: ' + err.message;
+        }
+      } finally {
+        linkBtn.disabled = false;
+        linkBtn.innerHTML = origText;
+      }
+    });
+
     document.getElementById('dp2faToggle')?.addEventListener('change', (e) => {
       const lbl = document.getElementById('dp2faLabel');
       if (lbl) {
@@ -4026,6 +4402,7 @@ async function loadDashPanel(tab){
         lbl.style.color = e.target.checked ? 'var(--emerald)' : 'var(--ink-soft)';
       }
     });
+
     document.getElementById('saveProfileBtn').addEventListener('click', async ()=>{
       const btn = document.getElementById('saveProfileBtn');
       const toggle2fa = document.getElementById('dp2faToggle')?.checked || false;
@@ -4043,6 +4420,7 @@ async function loadDashPanel(tab){
       } catch(e){ toast(dbFriendlyError(e)); }
       finally { btn.textContent = 'حفظ التغييرات'; btn.disabled = false; }
     });
+
     document.getElementById('logoutBtn').addEventListener('click', async ()=>{
       try { await unregisterPush().catch(()=>{}); await fbAuth.signOut(); } catch(e){ console.error(e); }
       session.user = null; _watermarkBuilt = false; renderNavForUser(); toast('تم تسجيل الخروج'); navigate('');
@@ -4064,6 +4442,659 @@ function initCookieConsent(){
     try { localStorage.setItem('raqeem_cookie_consent', 'accepted'); } catch(e){ console.error(e); }
   });
 }
+
+/* =====================================================================
+   GEMINI API KEY PERSISTENT SYSTEM (مفتاح API الخاص بالمستخدم)
+   ===================================================================== */
+function getStoredGeminiKey() {
+  try {
+    const local = localStorage.getItem('sarmad_gemini_key');
+    if (local) return local;
+  } catch (_) {}
+  return session.user?.gemini_api_key || '';
+}
+
+function getGeminiHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  const key = getStoredGeminiKey();
+  if (key) {
+    headers['x-gemini-api-key'] = key;
+  }
+  return headers;
+}
+
+async function checkGeminiKeyStatus() {
+  const badge = document.getElementById('geminiKeyStatusBadge');
+  const text = document.getElementById('geminiKeyStatusText');
+  const tag = document.getElementById('geminiKeySourceTag');
+  const input = document.getElementById('userGeminiKeyInput');
+  const localKey = getStoredGeminiKey();
+  
+  if (input && localKey && !input.value) {
+    input.value = localKey;
+  }
+
+  try {
+    const headers = {};
+    if (localKey) headers['x-gemini-api-key'] = localKey;
+    const res = await fetch('/api/gemini/key', { headers });
+    const data = await res.json();
+    
+    if (data.isCustom || localKey) {
+      if (text) text.innerHTML = `<span style="color:var(--emerald); font-weight:700;">متصل بنجاح بمفتاحك المخصص</span> (${data.keyPreview || (localKey.slice(0,6)+'...'+localKey.slice(-4))})`;
+      if (tag) {
+        tag.textContent = 'مفتاح مخصص';
+        tag.style.background = 'rgba(16,185,129,0.15)';
+        tag.style.color = 'var(--emerald)';
+        tag.style.borderColor = 'var(--emerald)';
+      }
+    } else if (data.hasKey) {
+      if (text) text.innerHTML = `<span style="color:#0284C7; font-weight:600;">متصل بمفتاح المنصة الافتراضي</span> (${data.keyPreview || 'نشط'})`;
+      if (tag) {
+        tag.textContent = 'الافتراضي';
+        tag.style.background = 'var(--canvas)';
+        tag.style.color = 'var(--ink-soft)';
+        tag.style.borderColor = 'var(--line)';
+      }
+    } else {
+      if (text) text.innerHTML = `<span style="color:var(--danger); font-weight:600;">غير متصل بأي مفتاح</span>`;
+      if (tag) {
+        tag.textContent = 'مطلوب مفتاح';
+        tag.style.background = 'rgba(239,68,68,0.1)';
+        tag.style.color = 'var(--danger)';
+        tag.style.borderColor = 'var(--danger)';
+      }
+    }
+  } catch (err) {
+    if (text) text.textContent = localKey ? 'المفتاح محفوظ محلياً' : 'تعذر فحص حالة المفتاح من الخادم';
+  }
+}
+
+function openGeminiKeyModal() {
+  const overlay = document.getElementById('geminiKeyModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('active');
+  overlay.classList.add('open');
+  const feedback = document.getElementById('geminiKeyFeedback');
+  if (feedback) feedback.style.display = 'none';
+  checkGeminiKeyStatus();
+  const input = document.getElementById('userGeminiKeyInput');
+  if (input) setTimeout(() => input.focus(), 150);
+}
+window.openGeminiKeyModal = openGeminiKeyModal;
+
+function closeGeminiKeyModal() {
+  const overlay = document.getElementById('geminiKeyModalOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+    overlay.classList.remove('open');
+  }
+}
+window.closeGeminiKeyModal = closeGeminiKeyModal;
+
+function initGeminiKeyModal() {
+  const overlay = document.getElementById('geminiKeyModalOverlay');
+  const closeBtn = document.getElementById('geminiKeyModalClose');
+  const openBtn = document.getElementById('openGeminiKeyModalBtn');
+  const saveBtn = document.getElementById('saveGeminiKeyBtn');
+  const removeBtn = document.getElementById('removeGeminiKeyBtn');
+  const toggleVisBtn = document.getElementById('toggleGeminiKeyVisibilityBtn');
+  const input = document.getElementById('userGeminiKeyInput');
+  const feedback = document.getElementById('geminiKeyFeedback');
+
+  if (openBtn) openBtn.addEventListener('click', openGeminiKeyModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeGeminiKeyModal);
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeGeminiKeyModal();
+    });
+  }
+
+  if (toggleVisBtn && input) {
+    toggleVisBtn.addEventListener('click', () => {
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  if (saveBtn && input) {
+    saveBtn.addEventListener('click', async () => {
+      const val = input.value.trim();
+      if (!val || val.length < 15) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239,68,68,0.1)';
+          feedback.style.color = 'var(--danger)';
+          feedback.textContent = 'يرجى إدخال مفتاح صالح يتكون من 15 حرفاً على الأقل يبدأ بـ AIzaSy...';
+        }
+        return;
+      }
+
+      const origText = saveBtn.innerHTML;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span>جارٍ فحص المفتاح والتحقق من الاتصال...</span>';
+      if (feedback) feedback.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/gemini/key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey: val })
+        });
+        const data = await res.json();
+        if (data.error) {
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.style.background = 'rgba(239,68,68,0.1)';
+            feedback.style.color = 'var(--danger)';
+            feedback.textContent = data.error;
+          }
+          toast(data.error);
+        } else {
+          try { localStorage.setItem('sarmad_gemini_key', val); } catch(_) {}
+          if (session.user?.uid) {
+            try { await DB.update('Users', session.user.uid, { gemini_api_key: val }); } catch(_) {}
+          }
+          if (feedback) {
+            feedback.style.display = 'block';
+            feedback.style.background = 'rgba(16,185,129,0.12)';
+            feedback.style.color = 'var(--emerald)';
+            feedback.textContent = 'تم التحقق من المفتاح بنجاح وحفظه للاتصال الدائم في جميع العمليات!';
+          }
+          toast('تم حفظ مفتاح Gemini API بنجاح! سيتم استخدامه دائماً.');
+          checkGeminiKeyStatus();
+          setTimeout(() => closeGeminiKeyModal(), 1200);
+        }
+      } catch (err) {
+        if (feedback) {
+          feedback.style.display = 'block';
+          feedback.style.background = 'rgba(239,68,68,0.1)';
+          feedback.style.color = 'var(--danger)';
+          feedback.textContent = 'تعذر التحقق من الخادم: ' + err.message;
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = origText;
+      }
+    });
+  }
+
+  if (removeBtn && input) {
+    removeBtn.addEventListener('click', async () => {
+      if (!confirm('هل ترغب بإزالة المفتاح المخصص والعودة للإعدادات الافتراضية؟')) return;
+      try {
+        await fetch('/api/gemini/key', { method: 'DELETE' });
+      } catch (_) {}
+      try { localStorage.removeItem('sarmad_gemini_key'); } catch(_) {}
+      if (session.user?.uid) {
+        try { await DB.update('Users', session.user.uid, { gemini_api_key: '' }); } catch(_) {}
+      }
+      input.value = '';
+      if (feedback) {
+        feedback.style.display = 'block';
+        feedback.style.background = 'var(--canvas)';
+        feedback.style.color = 'var(--ink-soft)';
+        feedback.textContent = 'تمت إزالة المفتاح المخصص واستعادة الإعدادات الافتراضية.';
+      }
+      toast('تمت إزالة المفتاح واستعادة الإعدادات الافتراضية');
+      checkGeminiKeyStatus();
+    });
+  }
+}
+
+/* =====================================================================
+   GITHUB INTEGRATION & LAB REPOSITORY BROWSER
+   ===================================================================== */
+function getStoredGithubUser() {
+  try {
+    const raw = localStorage.getItem('sarmad_github_user');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return session.user?.github || null;
+}
+
+function saveStoredGithubUser(data) {
+  try {
+    localStorage.setItem('sarmad_github_user', JSON.stringify(data));
+  } catch (_) {}
+  if (session.user) {
+    session.user.github = data;
+    if (session.user.uid) {
+      DB.update('Users', session.user.uid, { github: data }).catch(() => {});
+    }
+  }
+}
+
+function clearStoredGithubUser() {
+  try { localStorage.removeItem('sarmad_github_user'); } catch(_) {}
+  if (session.user) {
+    session.user.github = null;
+    if (session.user.uid) {
+      DB.update('Users', session.user.uid, { github: null }).catch(() => {});
+    }
+  }
+}
+
+let _cachedGithubRepos = [];
+let _currentBrowsingRepo = null;
+let _currentBrowsingPath = '';
+
+function openGithubLabModal(prefillUsername) {
+  const overlay = document.getElementById('githubLabModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('active');
+  overlay.classList.add('open');
+
+  const input = document.getElementById('githubLabUsernameInput');
+  const stored = getStoredGithubUser();
+  const targetUser = prefillUsername || (stored && stored.login) || (input ? input.value.trim() : '');
+
+  if (input && targetUser) {
+    input.value = targetUser;
+  }
+
+  if (targetUser) {
+    fetchAndRenderGithubRepos(targetUser);
+  } else {
+    const list = document.getElementById('githubLabReposList');
+    if (list) {
+      list.innerHTML = `
+        <div style="text-align:center; padding:40px 16px; color:var(--ink-soft); font-size:13px;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style="opacity:0.4; margin-bottom:12px;"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <div>أدخل اسم مستخدم GitHub أعلاه أو اربط حسابك في الإعدادات لاستعراض مشاريعك ومستودعاتك فورياً في المعمل.</div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeGithubLabModal(); navigate('dashboard');" style="margin-top:12px;">الانتقال لإعدادات الملف الشخصي للربط</button>
+        </div>
+      `;
+    }
+  }
+}
+window.openGithubLabModal = openGithubLabModal;
+
+function closeGithubLabModal() {
+  const overlay = document.getElementById('githubLabModalOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+    overlay.classList.remove('open');
+  }
+}
+window.closeGithubLabModal = closeGithubLabModal;
+
+async function fetchAndRenderGithubRepos(username) {
+  const list = document.getElementById('githubLabReposList');
+  const badge = document.getElementById('githubLabUserBadge');
+  const avatar = document.getElementById('githubLabUserAvatar');
+  const nameEl = document.getElementById('githubLabUserName');
+  const reposCountEl = document.getElementById('githubLabUserReposCount');
+  const profileLink = document.getElementById('githubLabProfileLink');
+  const filterInput = document.getElementById('githubLabFilterInput');
+
+  if (!username || !username.trim()) {
+    toast('يرجى إدخال اسم مستخدم GitHub');
+    return;
+  }
+
+  const cleanUser = username.trim();
+  if (list) {
+    list.innerHTML = `
+      <div style="text-align:center; padding:30px 16px; color:var(--ink-soft);">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin" style="animation:spin 1s linear infinite; margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+        <div>جارٍ جلب مستودعات GitHub لـ (${escapeHtml(cleanUser)})...</div>
+      </div>
+    `;
+  }
+
+  try {
+    const stored = getStoredGithubUser();
+    const tokenHeader = (stored && stored.token) ? { 'x-github-token': stored.token } : {};
+
+    const [userRes, reposRes] = await Promise.all([
+      fetch(`/api/github/user/${encodeURIComponent(cleanUser)}`, { headers: tokenHeader }),
+      fetch(`/api/github/repos/${encodeURIComponent(cleanUser)}`, { headers: tokenHeader })
+    ]);
+
+    const userData = await userRes.json();
+    const reposData = await reposRes.json();
+
+    if (userRes.ok && userData && userData.login) {
+      if (badge) badge.style.display = 'flex';
+      if (avatar) avatar.src = userData.avatar_url || '';
+      if (nameEl) nameEl.textContent = `${userData.name || userData.login} (@${userData.login})`;
+      if (reposCountEl) reposCountEl.textContent = `(${userData.public_repos || 0} مستودع)`;
+      if (profileLink) profileLink.href = userData.html_url || `https://github.com/${userData.login}`;
+
+      if (!stored || stored.login.toLowerCase() === cleanUser.toLowerCase()) {
+        saveStoredGithubUser({
+          login: userData.login,
+          name: userData.name || userData.login,
+          avatar_url: userData.avatar_url,
+          bio: userData.bio,
+          public_repos: userData.public_repos,
+          html_url: userData.html_url,
+          token: (stored && stored.token) || ''
+        });
+      }
+    }
+
+    if (!reposRes.ok || reposData.error) {
+      if (list) list.innerHTML = `<div style="color:var(--danger); text-align:center; padding:24px;">${escapeHtml(reposData.error || 'تعذر جلب المستودعات.')}</div>`;
+      return;
+    }
+
+    _cachedGithubRepos = reposData.repos || [];
+    if (filterInput) filterInput.style.display = 'block';
+    renderGithubReposListFiltered('');
+
+  } catch (err) {
+    if (list) list.innerHTML = `<div style="color:var(--danger); text-align:center; padding:24px;">حدث خطأ أثناء الاتصال بـ GitHub: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderGithubReposListFiltered(query) {
+  const list = document.getElementById('githubLabReposList');
+  if (!list) return;
+
+  const q = (query || '').toLowerCase().trim();
+  let repos = _cachedGithubRepos;
+  if (q) {
+    repos = repos.filter(r => 
+      (r.name || '').toLowerCase().includes(q) ||
+      (r.description || '').toLowerCase().includes(q) ||
+      (r.language || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (!repos.length) {
+    list.innerHTML = `<div style="text-align:center; padding:32px 16px; color:var(--ink-soft); font-size:13px;">لا توجد مستودعات مطابقة للبحث.</div>`;
+    return;
+  }
+
+  list.innerHTML = repos.map(repo => `
+    <div class="github-repo-card" data-repo-name="${escapeHtml(repo.name)}" data-repo-owner="${escapeHtml(repo.full_name.split('/')[0])}">
+      <div class="github-repo-head">
+        <div class="github-repo-name">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>${escapeHtml(repo.name)}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button type="button" class="btn btn-ghost btn-sm btn-browse-files" style="padding:3px 10px; font-size:11.5px; border:1px solid var(--line);" data-owner="${escapeHtml(repo.full_name.split('/')[0])}" data-repo="${escapeHtml(repo.name)}">
+            استعراض الملفات 📂
+          </button>
+        </div>
+      </div>
+      ${repo.description ? `<div class="github-repo-desc">${escapeHtml(repo.description)}</div>` : ''}
+      <div class="github-repo-meta">
+        ${repo.language ? `<span><span class="github-repo-lang-dot"></span> ${escapeHtml(repo.language)}</span>` : ''}
+        <span>⭐ ${repo.stars}</span>
+        <span>🍴 ${repo.forks}</span>
+        <span>${escapeHtml((repo.updated_at || '').slice(0, 10))}</span>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.btn-browse-files').forEach(b => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      browseGithubRepoFiles(b.dataset.owner, b.dataset.repo, '');
+    });
+  });
+
+  list.querySelectorAll('.github-repo-card').forEach(card => {
+    card.addEventListener('click', () => {
+      browseGithubRepoFiles(card.dataset.repoOwner, card.dataset.repoName, '');
+    });
+  });
+}
+
+async function browseGithubRepoFiles(owner, repo, subPath = '') {
+  const list = document.getElementById('githubLabReposList');
+  if (!list) return;
+
+  _currentBrowsingRepo = { owner, repo };
+  _currentBrowsingPath = subPath;
+
+  list.innerHTML = `
+    <div style="text-align:center; padding:30px 16px; color:var(--ink-soft);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin" style="animation:spin 1s linear infinite; margin-bottom:8px;"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+      <div>جارٍ استعراض محتويات المستودع (${escapeHtml(repo)}${subPath ? '/' + escapeHtml(subPath) : ''})...</div>
+    </div>
+  `;
+
+  try {
+    const stored = getStoredGithubUser();
+    const tokenHeader = (stored && stored.token) ? { 'x-github-token': stored.token } : {};
+    const url = `/api/github/contents/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}?path=${encodeURIComponent(subPath)}`;
+    const res = await fetch(url, { headers: tokenHeader });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      list.innerHTML = `<div style="color:var(--danger); padding:20px; text-align:center;">${escapeHtml(data.error || 'تعذر جلب ملفات المستودع.')}</div>`;
+      return;
+    }
+
+    const items = data.items || [];
+    items.sort((a, b) => (b.type === 'dir' ? 1 : 0) - (a.type === 'dir' ? 1 : 0) || a.name.localeCompare(b.name));
+
+    const pathParts = subPath ? subPath.split('/') : [];
+    let breadcrumbHtml = `<div class="github-breadcrumbs">
+      <span onclick="renderGithubReposListFiltered('')">‹ العودة لقائمة المستودعات</span> /
+      <span onclick="browseGithubRepoFiles('${owner}', '${repo}', '')">${escapeHtml(repo)}</span>`;
+    
+    let cumPath = '';
+    pathParts.forEach((part, i) => {
+      cumPath += (cumPath ? '/' : '') + part;
+      const isLast = i === pathParts.length - 1;
+      if (isLast) {
+        breadcrumbHtml += ` / <span>${escapeHtml(part)}</span>`;
+      } else {
+        breadcrumbHtml += ` / <span onclick="browseGithubRepoFiles('${owner}', '${repo}', '${cumPath}')">${escapeHtml(part)}</span>`;
+      }
+    });
+    breadcrumbHtml += `</div>`;
+
+    const hasHtml = items.some(it => it.name.toLowerCase() === 'index.html');
+    const hasCss = items.some(it => it.name.toLowerCase().endsWith('.css'));
+    const hasJs = items.some(it => it.name.toLowerCase().endsWith('.js'));
+    const isWebProject = hasHtml || (hasCss && hasJs);
+
+    let quickImportBtn = '';
+    if (isWebProject) {
+      quickImportBtn = `
+        <div style="background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:10px; padding:10px 14px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
+          <span style="font-size:12.5px; color:#0284C7; font-weight:600;">تم اكتشاف مشروع ويب متكامل (HTML / CSS / JS)</span>
+          <button type="button" class="btn btn-primary btn-sm" id="btnImportWholeWebBundle" style="font-size:12px; padding:4px 12px;">
+            استيراد المشروع بالكامل إلى المعمل ⚡
+          </button>
+        </div>
+      `;
+    }
+
+    let itemsHtml = `
+      <div class="github-file-tree">
+        ${pathParts.length > 0 ? `
+          <div class="github-file-item" onclick="browseGithubParentFolder('${owner}', '${repo}', '${subPath}')" style="color:#0284C7; font-weight:600;">
+            <span>📁 .. (المجلد السابق)</span>
+          </div>
+        ` : ''}
+        ${items.map(it => {
+          const isDir = it.type === 'dir';
+          const icon = isDir ? '📁' : (it.name.endsWith('.html') ? '🌐' : (it.name.endsWith('.css') ? '🎨' : (it.name.endsWith('.js') ? '📜' : (it.name.endsWith('.py') ? '🐍' : (it.name.endsWith('.sql') ? '🗄️' : '📄')))));
+          return `
+            <div class="github-file-item" data-path="${escapeHtml(it.path)}" data-type="${it.type}" data-name="${escapeHtml(it.name)}">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span>${icon}</span>
+                <span style="font-family:ui-monospace, monospace; font-weight:${isDir ? '600' : '400'};">${escapeHtml(it.name)}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                ${!isDir ? `<span style="font-size:11px; color:var(--ink-soft);">${it.size ? Math.round(it.size / 1024) + ' KB' : ''}</span>` : ''}
+                ${!isDir ? `<button type="button" class="btn btn-ghost btn-sm btn-import-single-file" data-path="${escapeHtml(it.path)}" data-name="${escapeHtml(it.name)}" style="padding:2px 8px; font-size:11.5px; border:1px solid var(--line);">استيراد للمعمل</button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    list.innerHTML = breadcrumbHtml + quickImportBtn + itemsHtml;
+
+    list.querySelectorAll('.github-file-item[data-type="dir"]').forEach(item => {
+      item.addEventListener('click', () => {
+        browseGithubRepoFiles(owner, repo, item.dataset.path);
+      });
+    });
+
+    list.querySelectorAll('.btn-import-single-file').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        importGithubFileToLab(owner, repo, btn.dataset.path, btn.dataset.name);
+      });
+    });
+
+    const wholeBtn = document.getElementById('btnImportWholeWebBundle');
+    if (wholeBtn) {
+      wholeBtn.addEventListener('click', () => {
+        importWholeWebBundle(owner, repo, subPath, items);
+      });
+    }
+
+  } catch (err) {
+    list.innerHTML = `<div style="color:var(--danger); padding:20px; text-align:center;">حدث خطأ: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function browseGithubParentFolder(owner, repo, currentPath) {
+  const parts = currentPath.split('/');
+  parts.pop();
+  browseGithubRepoFiles(owner, repo, parts.join('/'));
+}
+
+async function importGithubFileToLab(owner, repo, path, filename) {
+  try {
+    toast(`جارٍ جلب واستيراد ${filename}...`);
+    const stored = getStoredGithubUser();
+    const tokenHeader = (stored && stored.token) ? { 'x-github-token': stored.token } : {};
+    const res = await fetch(`/api/github/contents/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}?path=${encodeURIComponent(path)}`, { headers: tokenHeader });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      toast('تعذر استيراد الملف: ' + (data.error || 'خطأ'));
+      return;
+    }
+
+    const content = data.content || '';
+    const lower = filename.toLowerCase();
+
+    if (lower.endsWith('.html')) {
+      _activeLabTab = 'web';
+      _activeWebFile = 'html';
+      _codeLabState.web.html = content;
+    } else if (lower.endsWith('.css')) {
+      _activeLabTab = 'web';
+      _activeWebFile = 'css';
+      _codeLabState.web.css = content;
+    } else if (lower.endsWith('.js')) {
+      _activeLabTab = 'web';
+      _activeWebFile = 'js';
+      _codeLabState.web.js = content;
+    } else if (lower.endsWith('.py')) {
+      _activeLabTab = 'python';
+      _codeLabState.python = content;
+    } else if (lower.endsWith('.sql')) {
+      _activeLabTab = 'sql';
+      _codeLabState.sql = content;
+    } else {
+      if (_activeLabTab === 'web') {
+        _codeLabState.web[_activeWebFile] = content;
+      } else {
+        _codeLabState[_activeLabTab] = content;
+      }
+    }
+
+    closeGithubLabModal();
+    if (window.location.hash.includes('code-lab') || window.location.hash.includes('coding-lab') || window.location.hash.includes('lab')) {
+      renderCodeLab();
+    } else {
+      navigate('code-lab');
+    }
+    toast(`تم استيراد الملف (${filename}) إلى المعمل البرمجي بنجاح! 🚀`);
+  } catch (err) {
+    toast('تعذر استيراد الملف: ' + err.message);
+  }
+}
+
+async function importWholeWebBundle(owner, repo, subPath, items) {
+  try {
+    toast('جارٍ استيراد مشروع الويب بالكامل من GitHub...');
+    const stored = getStoredGithubUser();
+    const tokenHeader = (stored && stored.token) ? { 'x-github-token': stored.token } : {};
+
+    const htmlItem = items.find(it => it.name.toLowerCase() === 'index.html') || items.find(it => it.name.toLowerCase().endsWith('.html'));
+    const cssItem = items.find(it => it.name.toLowerCase() === 'style.css') || items.find(it => it.name.toLowerCase().endsWith('.css'));
+    const jsItem = items.find(it => it.name.toLowerCase() === 'script.js' || it.name.toLowerCase() === 'main.js') || items.find(it => it.name.toLowerCase().endsWith('.js'));
+
+    const fetches = [];
+    if (htmlItem) {
+      fetches.push(fetch(`/api/github/contents/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}?path=${encodeURIComponent(htmlItem.path)}`, { headers: tokenHeader }).then(r=>r.json()).then(d=>{ if (d.content) _codeLabState.web.html = d.content; }));
+    }
+    if (cssItem) {
+      fetches.push(fetch(`/api/github/contents/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}?path=${encodeURIComponent(cssItem.path)}`, { headers: tokenHeader }).then(r=>r.json()).then(d=>{ if (d.content) _codeLabState.web.css = d.content; }));
+    }
+    if (jsItem) {
+      fetches.push(fetch(`/api/github/contents/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}?path=${encodeURIComponent(jsItem.path)}`, { headers: tokenHeader }).then(r=>r.json()).then(d=>{ if (d.content) _codeLabState.web.js = d.content; }));
+    }
+
+    await Promise.all(fetches);
+    _activeLabTab = 'web';
+    closeGithubLabModal();
+    if (window.location.hash.includes('code-lab')) {
+      renderCodeLab();
+    } else {
+      navigate('code-lab');
+    }
+    toast('تم استيراد مشروع الويب بالكامل (HTML / CSS / JS) بنجاح! 🎉');
+  } catch (err) {
+    toast('حدث خطأ أثناء استيراد المشروع: ' + err.message);
+  }
+}
+
+function initGithubLabModal() {
+  const overlay = document.getElementById('githubLabModalOverlay');
+  const closeBtn = document.getElementById('githubLabModalClose');
+  const fetchBtn = document.getElementById('githubLabFetchBtn');
+  const input = document.getElementById('githubLabUsernameInput');
+  const filterInput = document.getElementById('githubLabFilterInput');
+
+  if (closeBtn) closeBtn.addEventListener('click', closeGithubLabModal);
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeGithubLabModal();
+    });
+  }
+
+  if (fetchBtn && input) {
+    fetchBtn.addEventListener('click', () => {
+      fetchAndRenderGithubRepos(input.value);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') fetchAndRenderGithubRepos(input.value);
+    });
+  }
+
+  if (filterInput) {
+    filterInput.addEventListener('input', () => {
+      renderGithubReposListFiltered(filterInput.value);
+    });
+  }
+}
+window.initGithubLabModal = initGithubLabModal;
+window.renderGithubReposListFiltered = renderGithubReposListFiltered;
+window.browseGithubRepoFiles = browseGithubRepoFiles;
+window.browseGithubParentFolder = browseGithubParentFolder;
+window.importGithubFileToLab = importGithubFileToLab;
+window.fetchAndRenderGithubRepos = fetchAndRenderGithubRepos;
+window.openGithubLabModal = openGithubLabModal;
+window.closeGithubLabModal = closeGithubLabModal;
+window.getStoredGithubUser = getStoredGithubUser;
+window.saveStoredGithubUser = saveStoredGithubUser;
+window.clearStoredGithubUser = clearStoredGithubUser;
 
 /* =====================================================================
    AI ASSISTANT (GEMINI CHAT, SEARCH GROUNDING & LIVE API)
@@ -4315,7 +5346,7 @@ function bindAiChatEvents() {
 
         const res = await fetch('/api/gemini/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getGeminiHeaders(),
           body: JSON.stringify({
             messages: payloadMessages,
             model: _chatModel,
@@ -4393,7 +5424,8 @@ class LiveVoiceManager {
       this.nextStartTime = this.outputAudioCtx.currentTime;
 
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${location.host}/api/live`;
+      const userKey = getStoredGeminiKey();
+      const wsUrl = `${protocol}//${location.host}/api/live${userKey ? `?apiKey=${encodeURIComponent(userKey)}` : ''}`;
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -4781,7 +5813,7 @@ function bindScienceLabEvents() {
 
         const res = await fetch('/api/gemini/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getGeminiHeaders(),
           body: JSON.stringify({
             messages: [{ role: 'user', content: promptText }],
             model: 'gemini-3.5-flash',
@@ -4979,6 +6011,7 @@ function initTwoFactorModal() {
   window.showTwoFactorModal = function(callback) {
     onVerifiedCallback = callback;
     overlay.classList.add('active');
+    overlay.classList.add('open');
     if (input) {
       input.value = '';
       setTimeout(() => input.focus(), 150);
@@ -4989,6 +6022,7 @@ function initTwoFactorModal() {
 
   window.closeTwoFactorModal = function() {
     overlay.classList.remove('active');
+    overlay.classList.remove('open');
     if (timer) clearInterval(timer);
   };
 
@@ -5038,6 +6072,7 @@ function openAiDrawer() {
   const drawerOverlay = document.getElementById('aiDrawerOverlay');
   if (drawerOverlay) {
     drawerOverlay.classList.add('active');
+    drawerOverlay.classList.add('open');
     const input = document.getElementById('aiDrawerInput');
     if (input) setTimeout(() => input.focus(), 100);
   } else {
@@ -5046,12 +6081,29 @@ function openAiDrawer() {
 }
 window.openAiDrawer = openAiDrawer;
 
+function closeAiDrawer() {
+  const drawerOverlay = document.getElementById('aiDrawerOverlay');
+  if (drawerOverlay) {
+    drawerOverlay.classList.remove('active');
+    drawerOverlay.classList.remove('open');
+  }
+}
+window.closeAiDrawer = closeAiDrawer;
+
 function initAiFab() {
   const fabBtn = document.getElementById('aiFabBtn');
   const drawerOverlay = document.getElementById('aiDrawerOverlay');
   const drawerClose = document.getElementById('aiDrawerClose');
   const expandLink = document.getElementById('aiExpandLink');
   const navAiBtn = document.getElementById('navAiBtn');
+  const openKeyBtn = document.getElementById('openGeminiKeyModalBtn');
+
+  if (openKeyBtn) {
+    openKeyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openGeminiKeyModal();
+    });
+  }
 
   if (navAiBtn) {
     navAiBtn.addEventListener('click', (e) => {
@@ -5070,18 +6122,21 @@ function initAiFab() {
     if (drawerClose) {
       drawerClose.addEventListener('click', () => {
         drawerOverlay.classList.remove('active');
+        drawerOverlay.classList.remove('open');
       });
     }
 
     if (expandLink) {
       expandLink.addEventListener('click', () => {
         drawerOverlay.classList.remove('active');
+        drawerOverlay.classList.remove('open');
       });
     }
 
     drawerOverlay.addEventListener('click', (e) => {
       if (e.target === drawerOverlay) {
         drawerOverlay.classList.remove('active');
+        drawerOverlay.classList.remove('open');
       }
     });
 
@@ -5129,7 +6184,7 @@ function initAiFab() {
         try {
           const res = await fetch('/api/gemini/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getGeminiHeaders(),
             body: JSON.stringify({
               messages: [{ role: 'user', content: text }],
               model: 'gemini-3.5-flash'
@@ -5175,7 +6230,7 @@ function initAiFab() {
         try {
           const res = await fetch('/api/gemini/explain-code', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getGeminiHeaders(),
             body: JSON.stringify({
               code,
               language: codeLang ? codeLang.value : 'javascript',
@@ -5224,7 +6279,7 @@ function initAiFab() {
         try {
           const res = await fetch('/api/gemini/study-plan', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getGeminiHeaders(),
             body: JSON.stringify({
               goal,
               currentLevel: planLevel ? planLevel.value : 'مبتدئ من الصفر',
@@ -5269,7 +6324,7 @@ function initAiFab() {
         try {
           const res = await fetch('/api/gemini/quiz-challenge', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getGeminiHeaders(),
             body: JSON.stringify({
               topic,
               difficulty: quizDifficulty ? quizDifficulty.value : 'متوسط'
@@ -5633,8 +6688,18 @@ function openDailyTipModal(categoryOverride) {
   renderTipContent(tip);
 
   overlay.classList.add('active');
+  overlay.classList.add('open');
 }
 window.openDailyTipModal = openDailyTipModal;
+
+function closeDailyTipModal() {
+  const overlay = document.getElementById('dailyTipOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+    overlay.classList.remove('open');
+  }
+}
+window.closeDailyTipModal = closeDailyTipModal;
 
 function initDailyTips() {
   const overlay = document.getElementById('dailyTipOverlay');
@@ -5667,15 +6732,11 @@ function initDailyTips() {
 
   if (overlay) {
     if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        overlay.classList.remove('active');
-      });
+      closeBtn.addEventListener('click', closeDailyTipModal);
     }
 
     overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        overlay.classList.remove('active');
-      }
+      if (e.target === overlay) closeDailyTipModal();
     });
 
     // Category chips click
@@ -5714,7 +6775,7 @@ function initDailyTips() {
         try {
           const res = await fetch('/api/gemini/daily-tip', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getGeminiHeaders(),
             body: JSON.stringify({ category: _currentTipCategory })
           });
           const data = await res.json();
@@ -5877,6 +6938,18 @@ function initKeyboardShortcuts() {
         e.preventDefault();
         return;
       }
+      const geminiModal = document.getElementById('geminiKeyModalOverlay');
+      if (geminiModal && (geminiModal.classList.contains('active') || geminiModal.classList.contains('open'))) {
+        closeGeminiKeyModal();
+        e.preventDefault();
+        return;
+      }
+      const ghModal = document.getElementById('githubLabModalOverlay');
+      if (ghModal && (ghModal.classList.contains('active') || ghModal.classList.contains('open'))) {
+        closeGithubLabModal();
+        e.preventDefault();
+        return;
+      }
       const mobileMenu = document.getElementById('mobileMenu');
       if (mobileMenu && mobileMenu.classList.contains('open')) {
         mobileMenu.classList.remove('open');
@@ -6003,10 +7076,15 @@ function initCommandPalette() {
   const resultsHost = document.getElementById('commandPaletteResults');
   if (!overlay || !input || !resultsHost) return;
 
-  // Click outside to close
+  // Click outside or esc hint to close
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) closeCommandPalette();
   });
+  const escHint = document.getElementById('paletteEscHint');
+  if (escHint) {
+    escHint.style.cursor = 'pointer';
+    escHint.addEventListener('click', closeCommandPalette);
+  }
 
   // Filter chips
   if (filtersHost) {
@@ -6054,6 +7132,7 @@ function openCommandPalette() {
   if (!overlay || !input) return;
 
   overlay.classList.add('active');
+  overlay.classList.add('open');
   input.value = '';
   _paletteSelectedIndex = 0;
   _paletteActiveFilter = 'all';
@@ -6067,8 +7146,13 @@ function openCommandPalette() {
 
 function closeCommandPalette() {
   const overlay = document.getElementById('commandPaletteOverlay');
-  if (overlay) overlay.classList.remove('active');
+  if (overlay) {
+    overlay.classList.remove('active');
+    overlay.classList.remove('open');
+  }
 }
+window.openCommandPalette = openCommandPalette;
+window.closeCommandPalette = closeCommandPalette;
 
 function renderCommandPaletteResults(query) {
   const resultsHost = document.getElementById('commandPaletteResults');
@@ -6208,13 +7292,21 @@ function initShortcutsGuide() {
 
 function openShortcutsGuide() {
   const overlay = document.getElementById('shortcutsGuideOverlay');
-  if (overlay) overlay.classList.add('active');
+  if (overlay) {
+    overlay.classList.add('active');
+    overlay.classList.add('open');
+  }
 }
 
 function closeShortcutsGuide() {
   const overlay = document.getElementById('shortcutsGuideOverlay');
-  if (overlay) overlay.classList.remove('active');
+  if (overlay) {
+    overlay.classList.remove('active');
+    overlay.classList.remove('open');
+  }
 }
+window.openShortcutsGuide = openShortcutsGuide;
+window.closeShortcutsGuide = closeShortcutsGuide;
 
 /* =====================================================================
    INTERACTIVE CODING LABS (معامل سرمد البرمجية المتكاملة)
@@ -6807,6 +7899,10 @@ async function renderCodeLab(param) {
             <span>تشغيل الكود</span>
             <kbd style="background:rgba(255,255,255,0.25); color:#fff; border-color:transparent;">Ctrl+Enter</kbd>
           </button>
+          <button class="codelab-action-btn github-btn" id="codeLabGithubBtn" type="button" title="استعراض مشاريع واستيراد أكواد GitHub">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            <span>مشاريع GitHub</span>
+          </button>
           <button class="codelab-action-btn ai-btn" id="codeLabAiBtn" type="button" title="فحص وشرح الكود الذكي (Ctrl+Shift+E)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z"/><path d="M6 10v1a6 6 0 0 0 12 0v-1"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
             <span>ذكاء سرمد</span>
@@ -7099,6 +8195,20 @@ function initCodeLabListeners() {
       const term = document.getElementById('codeLabWebTerminal');
       if (term) term.innerHTML = '<div class="codelab-terminal-line dim">تم مسح سجل الكونسول.</div>';
     });
+  }
+
+  // GitHub Projects Modal Trigger
+  const githubBtn = document.getElementById('codeLabGithubBtn');
+  if (githubBtn) {
+    githubBtn.addEventListener('click', () => {
+      openGithubLabModal();
+    });
+  }
+
+  // Deep-link check for auto-opening GitHub repos modal
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+  if (urlParams.get('openGithub') === '1' || urlParams.get('github') === '1') {
+    setTimeout(() => openGithubLabModal(), 250);
   }
 
   // Initial Run for Web
@@ -7433,7 +8543,7 @@ async function triggerCodeLabAiAssist(action) {
   try {
     const res = await fetch('/api/gemini/lab-assist', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getGeminiHeaders(),
       body: JSON.stringify({
         action,
         language: lang,
@@ -7523,6 +8633,8 @@ initDailyTips();
 initKeyboardShortcuts();
 initCommandPalette();
 initShortcutsGuide();
+initGeminiKeyModal();
+initGithubLabModal();
 // Login is now required to see anything, so the very first render must
 // wait for Firebase to finish restoring a persisted session — otherwise a
 // returning, already-logged-in student would see a flash of the

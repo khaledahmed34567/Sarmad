@@ -18,8 +18,23 @@ app.use(express.json({ limit: '10mb' }));
 
 import fs from 'fs';
 
-// Helper to reliably retrieve valid Gemini API key
-function getGeminiApiKey() {
+// Runtime storage for user-configured custom Gemini API key
+const USER_KEY_FILE = path.join(__dirname, '.user_gemini_key');
+let runtimeCustomApiKey = '';
+try {
+  if (fs.existsSync(USER_KEY_FILE)) {
+    runtimeCustomApiKey = fs.readFileSync(USER_KEY_FILE, 'utf8').trim();
+  }
+} catch (_) {}
+
+// Helper to reliably retrieve valid Gemini API key (supports request override, custom saved key, and env)
+function getGeminiApiKey(requestKey = null) {
+  if (requestKey && typeof requestKey === 'string' && requestKey.trim().length > 10) {
+    return requestKey.trim();
+  }
+  if (runtimeCustomApiKey && runtimeCustomApiKey.length > 10) {
+    return runtimeCustomApiKey;
+  }
   const envKey = (process.env.GEMINI_API_KEY || '').trim();
   if (envKey && !envKey.startsWith('MY_') && envKey.length > 10) {
     return envKey;
@@ -35,8 +50,8 @@ function getGeminiApiKey() {
   return envKey;
 }
 
-function getGeminiClient() {
-  const key = getGeminiApiKey();
+function getGeminiClient(requestKey = null) {
+  const key = getGeminiApiKey(requestKey);
   if (!key) return null;
   return new GoogleGenAI({
     apiKey: key,
@@ -67,11 +82,14 @@ app.get(['/admin', '/admin.html'], (req, res) => {
 
 // API: Health & Gemini models status
 app.get('/api/health', (req, res) => {
-  const key = getGeminiApiKey();
+  const reqKey = req.headers['x-gemini-api-key'] || req.query.apiKey;
+  const key = getGeminiApiKey(reqKey);
   res.json({
     status: 'ok',
     hasApiKey: !!key,
     keyValid: key.length > 20,
+    isCustomKey: !!(reqKey || runtimeCustomApiKey),
+    keyPreview: key && key.length > 10 ? `${key.slice(0, 6)}...${key.slice(-4)}` : null,
     modelsAvailable: [
       'gemini-3.5-flash',
       'gemini-3.1-flash-lite',
@@ -82,11 +100,85 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// API: User Gemini Key Management (GET, POST, DELETE)
+app.get('/api/gemini/key', (req, res) => {
+  const reqKey = req.headers['x-gemini-api-key'];
+  const key = getGeminiApiKey(reqKey);
+  res.json({
+    hasKey: !!key,
+    isCustom: !!(reqKey || runtimeCustomApiKey),
+    source: (reqKey ? 'request' : (runtimeCustomApiKey ? 'custom' : (process.env.GEMINI_API_KEY ? 'system' : 'none'))),
+    keyPreview: key && key.length > 10 ? `${key.slice(0, 6)}...${key.slice(-4)}` : ''
+  });
+});
+
+app.post('/api/gemini/key', async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.trim().length < 15) {
+      return res.status(400).json({ error: 'يرجى إدخال مفتاح Gemini API صالح يتكون من 15 حرفاً على الأقل.' });
+    }
+    const cleanKey = apiKey.trim();
+
+    // Verify key by sending a test lightweight ping to Gemini
+    const testClient = new GoogleGenAI({
+      apiKey: cleanKey,
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+    });
+
+    try {
+      await testClient.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [{ role: 'user', parts: [{ text: 'قل مرحباً بكلمة واحدة فقط' }] }]
+      });
+    } catch (testErr) {
+      console.warn('API key test failed:', testErr.message);
+      return res.status(400).json({
+        error: 'فشل التحقق من مفتاح Gemini API: ' + (testErr.message || 'المفتاح غير صالح أو الحساب لا يملك صلاحيات وصول.')
+      });
+    }
+
+    // Key is verified successfully: persist it
+    runtimeCustomApiKey = cleanKey;
+    try {
+      fs.writeFileSync(USER_KEY_FILE, cleanKey, 'utf8');
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      message: 'تم التحقق من مفتاح Gemini API وحفظه بنجاح.',
+      keyPreview: `${cleanKey.slice(0, 6)}...${cleanKey.slice(-4)}`
+    });
+  } catch (err) {
+    console.error('Save API key error:', err);
+    res.status(500).json({ error: 'حدث خطأ أثناء حفظ المفتاح: ' + err.message });
+  }
+});
+
+app.delete('/api/gemini/key', (req, res) => {
+  try {
+    runtimeCustomApiKey = '';
+    try {
+      if (fs.existsSync(USER_KEY_FILE)) {
+        fs.unlinkSync(USER_KEY_FILE);
+      }
+    } catch (_) {}
+    const fallbackKey = getGeminiApiKey();
+    res.json({
+      success: true,
+      message: 'تمت إزالة المفتاح المخصص واستعادة الإعدادات الافتراضية بنجاح.',
+      hasSystemKey: !!fallbackKey
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Helper for model fallback
-async function callGeminiWithFallback(preferredModel, contents, config) {
-  const client = getGeminiClient();
+async function callGeminiWithFallback(preferredModel, contents, config, requestKey = null) {
+  const client = getGeminiClient(requestKey);
   if (!client) {
-    throw new Error('مفتاح Gemini API غير مهيأ في النظام.');
+    throw new Error('مفتاح Gemini API غير مهيأ. يرجى إدخال مفتاح API الخاص بك من إعدادات الذكاء الاصطناعي.');
   }
 
   // Model prioritization and fallback
@@ -119,6 +211,7 @@ async function callGeminiWithFallback(preferredModel, contents, config) {
 // API: Multi-turn Chat & Search Grounding
 app.post('/api/gemini/chat', async (req, res) => {
   try {
+    const requestKey = req.headers['x-gemini-api-key'] || req.body?.apiKey;
     const {
       messages = [],
       model = 'gemini-3.5-flash',
@@ -144,7 +237,7 @@ app.post('/api/gemini/chat', async (req, res) => {
       config.tools = [{ googleSearch: {} }];
     }
 
-    const { response, modelUsed } = await callGeminiWithFallback(model, contents, config);
+    const { response, modelUsed } = await callGeminiWithFallback(model, contents, config, requestKey);
 
     const text = response.text || '';
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -166,6 +259,7 @@ app.post('/api/gemini/chat', async (req, res) => {
 // NEW FEATURE: Smart Code Explainer, Debugger & Optimizer
 app.post('/api/gemini/explain-code', async (req, res) => {
   try {
+    const requestKey = req.headers['x-gemini-api-key'] || req.body?.apiKey;
     const { code, language = 'javascript', question = '' } = req.body;
     if (!code || !code.trim()) {
       return res.status(400).json({ error: 'الكود البرمجي مطلوب.' });
@@ -191,7 +285,7 @@ ${question ? `سؤال المستخدم المحدد: ${question}` : ''}
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
       systemInstruction: 'أنت مهندس برمجيات خبير يشرح الأكواد بأسلوب احترافي خالٍ تماماً من الإيموجيز.'
-    });
+    }, requestKey);
 
     res.json({
       result: response.text || '',
@@ -206,6 +300,7 @@ ${question ? `سؤال المستخدم المحدد: ${question}` : ''}
 // NEW FEATURE: Custom AI Study Plan Generator
 app.post('/api/gemini/study-plan', async (req, res) => {
   try {
+    const requestKey = req.headers['x-gemini-api-key'] || req.body?.apiKey;
     const { goal, currentLevel = 'beginner', hoursPerWeek = 10, weeks = 8 } = req.body;
     if (!goal || !goal.trim()) {
       return res.status(400).json({ error: 'الهدف التعليمي مطلوب.' });
@@ -232,7 +327,7 @@ app.post('/api/gemini/study-plan', async (req, res) => {
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
       systemInstruction: 'أنت مستشار تعليمي متخصص في صناعة الخطط الدراسية البرمجية دون استخدام أي رموز تعبيرية.'
-    });
+    }, requestKey);
 
     res.json({
       plan: response.text || '',
@@ -247,6 +342,7 @@ app.post('/api/gemini/study-plan', async (req, res) => {
 // NEW FEATURE: AI Coding Challenge & Quiz Generator
 app.post('/api/gemini/quiz-challenge', async (req, res) => {
   try {
+    const requestKey = req.headers['x-gemini-api-key'] || req.body?.apiKey;
     const { topic = 'JavaScript', difficulty = 'intermediate' } = req.body;
 
     const prompt = `أنشئ تحدياً برمجياً واختباراً ذكياً للموضوع (${topic}) بمستوى صعوبة (${difficulty}).
@@ -261,7 +357,7 @@ app.post('/api/gemini/quiz-challenge', async (req, res) => {
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
       systemInstruction: 'أنت مسؤول إعداد الاختبارات والتحديات البرمجية في منصة سرمد، تقدم أسئلة رصينة بدون أي إيموجيز.'
-    });
+    }, requestKey);
 
     res.json({
       challenge: response.text || '',
@@ -276,6 +372,7 @@ app.post('/api/gemini/quiz-challenge', async (req, res) => {
 // NEW FEATURE: Daily AI Programming Tip Generator
 app.post('/api/gemini/daily-tip', async (req, res) => {
   try {
+    const requestKey = req.headers['x-gemini-api-key'] || req.body?.apiKey;
     const { category = 'all', topic = '' } = req.body;
     const prompt = `قدم نصيحة برمجية احترافية ومفيدة للمطورين والطلاب في منصة سرمد.
 مجال النصيحة: ${category} ${topic ? `(تركيز إضافي: ${topic})` : ''}
@@ -293,7 +390,7 @@ app.post('/api/gemini/daily-tip', async (req, res) => {
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
       systemInstruction: 'أنت مهندس برمجيات محنك يقدم نصائح تقنية دقيقة وسريعة خالية تماماً من الإيموجيز.'
-    });
+    }, requestKey);
 
     res.json({
       tip: response.text || '',
@@ -496,6 +593,7 @@ except Exception as e:
 // NEW FEATURE: Lab AI Assistant (Explain, Debug, Optimize, Test Cases, Challenges)
 app.post('/api/gemini/lab-assist', async (req, res) => {
   try {
+    const requestKey = req.headers['x-gemini-api-key'] || req.body?.apiKey;
     const { action = 'explain', language = 'javascript', code = '', query = '' } = req.body;
     if (!code && action !== 'challenge') {
       return res.status(400).json({ error: 'الكود البرمجي مطلوب للمساعد الذكي.' });
@@ -559,7 +657,7 @@ ${query ? `سؤال إضافي: ${query}` : ''}
     const contents = [{ role: 'user', parts: [{ text: prompt }] }];
     const { response, modelUsed } = await callGeminiWithFallback('gemini-3.5-flash', contents, {
       systemInstruction: 'أنت مهندس ومصحح أكواد تعليمي في منصة سرمد، تقدم إجابات احترافية دقيقة خالية تماماً من الإيموجيز.'
-    });
+    }, requestKey);
 
     res.json({
       output: response.text || '',
@@ -713,6 +811,111 @@ app.get('/api/science/literature', async (req, res) => {
   }
 });
 
+// ============================================================================
+// GITHUB INTEGRATION API PROXY
+// ============================================================================
+function getGithubHeaders(req) {
+  const headers = {
+    'User-Agent': 'Sarmad-Platform',
+    'Accept': 'application/vnd.github.v3+json'
+  };
+  const token = req.headers['authorization'] || req.headers['x-github-token'] || req.query.token;
+  if (token && typeof token === 'string' && token.trim()) {
+    const cleanToken = token.trim();
+    headers['Authorization'] = cleanToken.startsWith('Bearer ') || cleanToken.startsWith('token ') ? cleanToken : `Bearer ${cleanToken}`;
+  }
+  return headers;
+}
+
+app.get('/api/github/user/:username', async (req, res) => {
+  try {
+    const username = encodeURIComponent(req.params.username.trim());
+    const r = await fetch(`https://api.github.com/users/${username}`, {
+      headers: getGithubHeaders(req)
+    });
+    if (!r.ok) {
+      return res.status(r.status).json({ error: 'لم يتم العثور على حساب GitHub أو الحساب خاص' });
+    }
+    const data = await r.json();
+    res.json({
+      login: data.login,
+      name: data.name || data.login,
+      avatar_url: data.avatar_url,
+      html_url: data.html_url,
+      bio: data.bio || '',
+      public_repos: data.public_repos || 0,
+      followers: data.followers || 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/github/repos/:username', async (req, res) => {
+  try {
+    const username = encodeURIComponent(req.params.username.trim());
+    const r = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=30`, {
+      headers: getGithubHeaders(req)
+    });
+    if (!r.ok) {
+      return res.status(r.status).json({ error: 'تعذر جلب مستودعات GitHub للمستخدم' });
+    }
+    const repos = await r.json();
+    const list = Array.isArray(repos) ? repos.map(item => ({
+      id: item.id,
+      name: item.name,
+      full_name: item.full_name,
+      description: item.description || '',
+      html_url: item.html_url,
+      language: item.language || 'Code',
+      stars: item.stargazers_count || 0,
+      forks: item.forks_count || 0,
+      updated_at: item.updated_at,
+      default_branch: item.default_branch || 'main'
+    })) : [];
+    res.json({ repos: list });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/github/contents/:owner/:repo', async (req, res) => {
+  try {
+    const { owner, repo } = req.params;
+    const pathQuery = req.query.path || '';
+    const cleanPath = pathQuery ? encodeURIComponent(pathQuery).replace(/%2F/g, '/') : '';
+    const r = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${cleanPath}`, {
+      headers: getGithubHeaders(req)
+    });
+    if (!r.ok) {
+      return res.status(r.status).json({ error: 'تعذر جلب محتويات المستودع' });
+    }
+    const data = await r.json();
+    if (Array.isArray(data)) {
+      const items = data.map(item => ({
+        name: item.name,
+        path: item.path,
+        type: item.type,
+        size: item.size,
+        download_url: item.download_url
+      }));
+      return res.json({ type: 'dir', items });
+    } else if (data.type === 'file') {
+      let content = '';
+      if (data.content) {
+        content = Buffer.from(data.content, 'base64').toString('utf8');
+      } else if (data.download_url) {
+        const rawRes = await fetch(data.download_url, { headers: getGithubHeaders(req) });
+        content = await rawRes.text();
+      }
+      return res.json({ type: 'file', name: data.name, path: data.path, content });
+    }
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Single Page Application fallback to index.html for all other GET requests
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -721,16 +924,24 @@ app.get('*', (req, res) => {
 // Live API WebSocket Setup on /api/live
 const wss = new WebSocketServer({ server, path: '/api/live' });
 
-wss.on('connection', async (clientWs) => {
+wss.on('connection', async (clientWs, req) => {
   console.log('Client connected to Live Voice WebSocket');
   let liveSession = null;
 
   try {
-    const liveClient = getGeminiClient();
+    let reqKey = null;
+    try {
+      if (req && req.url) {
+        const parsedUrl = new URL(req.url, 'http://localhost:3000');
+        reqKey = parsedUrl.searchParams.get('apiKey');
+      }
+    } catch (_) {}
+
+    const liveClient = getGeminiClient(reqKey);
     if (!liveClient) {
       clientWs.send(JSON.stringify({
         type: 'error',
-        error: 'Gemini API Key is not configured on the server.'
+        error: 'Gemini API Key is not configured on the server. يرجى إدخال مفتاح API الخاص بك من إعدادات الذكاء الاصطناعي.'
       }));
       clientWs.close();
       return;

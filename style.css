@@ -463,7 +463,42 @@ img{max-width:100%; display:block;}
 .pop-celebrate{animation:popCelebrate .5s cubic-bezier(.34,1.56,.64,1) both;}
 @keyframes countUpFade{from{opacity:0; transform:translateY(6px);}to{opacity:1; transform:translateY(0);}}
 .stat-box .stat-num,.stat-box .stat-num{animation:countUpFade .5s ease both;}
+
+/* Enhanced Track & Course Progress Cards in Student Dashboard */
+.track-progress-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:20px; margin-bottom:16px; box-shadow:var(--shadow-sm); transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;}
+.track-progress-card:hover{transform:translateY(-2px); box-shadow:var(--shadow-md); border-color:var(--emerald);}
+.track-progress-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;}
+.track-progress-title{font-family:'AppTitles',sans-serif; font-size:16px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px;}
+.track-progress-badge{font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--canvas); border:1px solid var(--line);}
+.track-progress-badge.done{background:#ECFDF5; color:#059669; border-color:#A7F3D0;}
+.track-progress-badge.in-progress{background:#EFF6FF; color:#2563EB; border-color:#BFDBFE;}
+.track-progress-badge.start{background:var(--canvas); color:var(--ink-soft);}
+.track-progress-bar-wrap{position:relative; height:12px; background:var(--line); border-radius:999px; overflow:hidden; margin:12px 0 10px; box-shadow:inset 0 1px 3px rgba(0,0,0,.08);}
+.track-progress-bar-fill{height:100%; border-radius:999px; background:linear-gradient(90deg,#10B981,#059669); transition:width .8s cubic-bezier(.34,1.56,.64,1); position:relative;}
+.track-progress-bar-fill.complete{background:linear-gradient(90deg,#10B981,#F59E0B); box-shadow:0 0 12px rgba(16,185,129,.5);}
+.track-progress-meta{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--ink-soft);}
+
+/* GitHub Modal in Coding Lab & File Browser */
+.github-repo-card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:10px; display:flex; flex-direction:column; gap:8px; cursor:pointer; transition:all .15s ease;}
+.github-repo-card:hover{border-color:#0284C7; background:var(--canvas); transform:translateX(-3px);}
+.github-repo-head{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.github-repo-name{font-weight:700; font-size:14px; color:var(--ink); font-family:ui-monospace, monospace; display:flex; align-items:center; gap:6px;}
+.github-repo-desc{font-size:12px; color:var(--ink-soft); line-height:1.5;}
+.github-repo-meta{display:flex; align-items:center; gap:12px; font-size:11.5px; color:var(--ink-soft); flex-wrap:wrap;}
+.github-repo-lang-dot{width:8px; height:8px; border-radius:50%; display:inline-block; background:#0284C7;}
+.github-file-tree{border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--canvas); margin-top:8px;}
+.github-file-item{display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--line); font-size:12.5px; cursor:pointer; transition:background .15s ease;}
+.github-file-item:last-child{border-bottom:none;}
+.github-file-item:hover{background:var(--surface);}
+.github-breadcrumbs{display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:10px; flex-wrap:wrap; color:var(--ink-soft);}
+.github-breadcrumbs span{cursor:pointer; color:#0284C7;}
+.github-breadcrumbs span:hover{text-decoration:underline;}
+.github-breadcrumbs span:last-child{cursor:default; color:var(--ink); font-weight:700; text-decoration:none;}
+.codelab-action-btn.github-btn{background:#0F172A; color:#F8FAFC; border-color:#334155;}
+.codelab-action-btn.github-btn:hover{background:#1E293B; color:#38BDF8; border-color:#0284C7;}
+
 @media(max-width:760px){
+  .desktop-nav-auth{display:none !important;}
   .dash-grid{grid-template-columns:1fr;}
   .dash-nav{flex-direction:row; overflow-x:auto; gap:6px; padding-bottom:6px; -webkit-overflow-scrolling:touch;}
   .dash-nav button{flex-shrink:0; white-space:nowrap;}
@@ -471,9 +506,11 @@ img{max-width:100%; display:block;}
 
 /* ---- Modal ---- */
 .modal-overlay{position:fixed; inset:0; background:rgba(15,14,10,.45); backdrop-filter:blur(4px); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity .22s ease;}
-.modal-overlay.open{opacity:1; pointer-events:auto;}
+.modal-overlay.open,
+.modal-overlay.active{opacity:1; pointer-events:auto;}
 .modal{background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); border-radius:var(--radius-lg); width:100%; max-width:420px; padding:32px; box-shadow:var(--shadow-lift); border:1px solid var(--glass-border); transform:translateY(14px) scale(.98); transition:transform .25s ease; max-height:88vh; overflow-y:auto;}
-.modal-overlay.open .modal{transform:translateY(0) scale(1);}
+.modal-overlay.open .modal,
+.modal-overlay.active .modal{transform:translateY(0) scale(1);}
 .modal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:22px;}
 .modal-head h2{font-size:20px;}
 .modal-close{width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:transparent; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-soft);}
