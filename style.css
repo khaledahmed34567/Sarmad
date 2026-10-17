@@ -1,10 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 /* ============ FONTS ============ */
 /* عناوين — headings */
-@font-face{font-family:'AppTitles';src:url('https://files.catbox.moe/236lzl.ttf') format('truetype'),url('https://files.catbox.moe/va4cz0.otf') format('opentype');font-weight:700;font-display:swap;}
 /* نصوص — body text: رفيع (light/regular) + ضخم (bold), same family, two weights */
-@font-face{font-family:'AppBody';src:url('https://files.catbox.moe/4rjalb.otf') format('opentype');font-weight:400;font-display:swap;}
-@font-face{font-family:'AppBody';src:url('https://files.catbox.moe/uqr0yx.otf') format('opentype');font-weight:700;font-display:swap;}
+@font-face{font-family:'AppTitles','AppTitles2';src:url('https://files.catbox.moe/uqr0yx.otf') format('opentype');font-weight:700;font-display:swap;}
+@font-face{font-family:'AppTitles2';src:url('https://files.catbox.moe/flmb6d.otf') format('opentype');font-weight:700;font-display:swap;}
+@font-face{font-family:'AppBody','AppBody2';src:url('https://files.catbox.moe/2k6107.otf') format('opentype');font-weight:400;font-display:swap;}
+@font-face{font-family:'AppBody2';src:url('https://files.catbox.moe/4rjalb.otf') format('opentype');font-weight:400;font-display:swap;}
+@font-face{font-family:'AppDate';src:url('https://files.catbox.moe/koigd8.ttf') format('truetype');font-weight:400;font-display:swap;}
+@font-face{font-family:'AppBody','AppBody2';src:url('https://files.catbox.moe/uqr0yx.otf') format('opentype');font-weight:700;font-display:swap;}
 /* ملاحظات — notes / long-form lesson content */
 @font-face{font-family:'AppArticles';src:url('https://files.catbox.moe/zhyu9p.otf') format('opentype');font-weight:400;font-display:swap;}
 /* التواريخ والوقت — dates & time */
@@ -45,7 +47,7 @@ html{overflow-x:hidden; scrollbar-gutter:stable; scroll-behavior:smooth;}
 @keyframes pageFadeIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
 html,body{margin:0;padding:0;background:var(--canvas);color:var(--ink); max-width:100%;}
 body{
-  overflow-x:hidden; font-family:'AppBody','SF Pro Arabic','Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; min-height:100dvh; transition:background .3s ease,color .3s ease;
+  overflow-x:hidden; font-family:'AppBody','AppBody2','SF Pro Arabic','Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; min-height:100dvh; transition:background .3s ease,color .3s ease;
   background-image:
     radial-gradient(720px 420px at 8% -8%, #155FDB0f, transparent 60%),
     radial-gradient(640px 480px at 100% 12%, #C6A87D14, transparent 55%),
@@ -72,8 +74,8 @@ img, video{ -webkit-user-drag:none; }
 ::-webkit-scrollbar-thumb{background:var(--line); border-radius:100px; border:2px solid var(--canvas);}
 ::-webkit-scrollbar-thumb:hover{background:var(--gold);}
 *{scrollbar-width:thin; scrollbar-color:var(--line) transparent;}
-h1,h2,h3,.title{font-family:'AppTitles','AppBody',sans-serif; font-weight:700; margin:0; letter-spacing:-.01em;}
-.articles{font-family:'AppBody','SF Pro Arabic','Segoe UI',sans-serif; line-height:1.9;}
+h1,h2,h3,.title{font-family:'AppTitles','AppTitles2','AppBody',sans-serif; font-weight:700; margin:0; letter-spacing:-.01em;}
+.articles{font-family:'AppBody','AppBody2','SF Pro Arabic','Segoe UI',sans-serif; line-height:1.9;}
 .eyebrow,.caption,label,.sub{font-family:'AppSub','AppBody',sans-serif;}
 a{color:inherit; text-decoration:none;}
 button{font-family:inherit;}
@@ -175,14 +177,14 @@ img{max-width:100%; display:block;}
 /* ---- Course badge (image + overlaid student name) ---- */
 .badge-card{position:relative; width:100%; border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-lift); margin-bottom:20px; background:#fff;}
 .badge-card img.badge-bg{width:100%; height:auto; display:block; -webkit-user-select:none; user-select:none;}
-.badge-card .badge-name{position:absolute; transform:translate(-50%,-50%); font-family:'AppTitles'; font-weight:700; white-space:nowrap; text-align:center;}
+.badge-card .badge-name{position:absolute; transform:translate(-50%,-50%); font-family:'AppTitles','AppTitles2'; font-weight:700; white-space:nowrap; text-align:center;}
 
 /* ---- Course/general accreditation — A4-proportioned formal document ---- */
 .accred-card{background:#FFFFFF; border:1px solid var(--line); box-shadow:var(--shadow-lift); margin:0 auto 20px; position:relative; width:100%; max-width:794px; aspect-ratio:210/297; padding:6% 8%; display:flex; flex-direction:column; box-sizing:border-box;}
 .accred-heading-img{height:56px; width:auto; display:block; margin:0 auto 28px;}
-.accred-title{font-family:'AppTitles'; font-size:22px; text-align:center; color:var(--emerald); margin-bottom:24px;}
-.accred-body{font-family:'AppBody'; font-size:15px; line-height:1.9; color:#2a2a26; flex:1;}
-.accred-name-line{font-family:'AppTitles'; font-size:20px; text-align:center; border-bottom:1.5px solid #0E1116; display:inline-block; padding:4px 24px 8px; margin:14px auto;}
+.accred-title{font-family:'AppTitles','AppTitles2'; font-size:22px; text-align:center; color:var(--emerald); margin-bottom:24px;}
+.accred-body{font-family:'AppBody','AppBody2'; font-size:15px; line-height:1.9; color:#2a2a26; flex:1;}
+.accred-name-line{font-family:'AppTitles','AppTitles2'; font-size:20px; text-align:center; border-bottom:1.5px solid #0E1116; display:inline-block; padding:4px 24px 8px; margin:14px auto;}
 .accred-terms{font-family:'AppSub'; font-size:11px; color:#6b6a60; line-height:1.6; border-top:1px solid var(--line); padding-top:14px; margin-top:20px;}
 .accred-footer{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-top:24px;}
 @media(max-width:640px){
@@ -195,7 +197,7 @@ img{max-width:100%; display:block;}
 }
 
 .faq-item{border:1px solid var(--glass-border); border-radius:var(--radius-md); background:var(--glass-bg); padding:16px 18px; margin-bottom:10px;}
-.faq-item summary{cursor:pointer; font-weight:700; font-family:'AppTitles';}
+.faq-item summary{cursor:pointer; font-weight:700; font-family:'AppTitles','AppTitles2';}
 .faq-item p{margin-top:10px; color:var(--ink-soft); font-size:14px; line-height:1.7;}
 .filter-bar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:20px;}
 .filter-bar .cselect{min-width:150px;}
@@ -249,7 +251,7 @@ img{max-width:100%; display:block;}
 .notfound-mark{width:64px; height:64px; margin:0 auto 18px; border-radius:50%; background:var(--emerald-soft); color:var(--emerald); display:flex; align-items:center; justify-content:center; opacity:0; animation:nfMark .6s ease .6s both;}
 .notfound-mark .icon{width:28px; height:28px;}
 @keyframes nfMark{from{opacity:0; transform:scale(.5) rotate(-12deg);}to{opacity:1; transform:scale(1) rotate(0);}}
-.notfound-code{font-family:'AppTitles'; font-size:15px; color:var(--gold); letter-spacing:.08em; margin-bottom:8px; opacity:0; animation:nfFade .5s ease .75s both;}
+.notfound-code{font-family:'AppTitles','AppTitles2'; font-size:15px; color:var(--gold); letter-spacing:.08em; margin-bottom:8px; opacity:0; animation:nfFade .5s ease .75s both;}
 .notfound-title{font-size:clamp(24px,4vw,32px); margin-bottom:12px; opacity:0; animation:nfFade .5s ease .85s both;}
 .notfound-sub{color:var(--ink-soft); font-size:14px; line-height:1.8; max-width:380px; margin:0 auto; opacity:0; animation:nfFade .5s ease .95s both;}
 .notfound-actions{display:flex; gap:10px; justify-content:center; margin-top:28px; flex-wrap:wrap; opacity:0; animation:nfFade .5s ease 1.05s both;}
@@ -339,7 +341,7 @@ img{max-width:100%; display:block;}
 .q-opt.selected{border-color:var(--emerald); background:var(--emerald-soft);}
 .q-opt input{accent-color:var(--emerald);}
 .quiz-result{text-align:center; padding:48px 20px;}
-.quiz-result .score{font-family:'AppTitles'; font-size:56px; color:var(--emerald);}
+.quiz-result .score{font-family:'AppTitles','AppTitles2'; font-size:56px; color:var(--emerald);}
 .quiz-result.fail .score{color:var(--danger);}
 
 /* ---- Payment ---- */
@@ -349,11 +351,11 @@ img{max-width:100%; display:block;}
 .pay-opt.active{border-color:var(--emerald); background:var(--emerald-soft);}
 .pay-opt .icon{width:30px; height:30px; margin:0 auto 12px;}
 .pay-detail{border:1px solid var(--glass-border); background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); border-radius:var(--radius-lg); padding:26px; margin-top:20px; box-shadow:var(--shadow-soft);}
-.copy-row{display:flex; align-items:center; gap:10px; background:var(--surface-2); border-radius:var(--radius-sm); padding:12px 16px; font-family:'AppTitles'; font-size:17px; direction:ltr; justify-content:space-between;}
+.copy-row{display:flex; align-items:center; gap:10px; background:var(--surface-2); border-radius:var(--radius-sm); padding:12px 16px; font-family:'AppTitles','AppTitles2'; font-size:17px; direction:ltr; justify-content:space-between;}
 .plan-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:8px;}
 .plan-card{border:1px solid var(--glass-border); background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); border-radius:var(--radius-md); padding:22px; text-align:center; box-shadow:var(--shadow-soft);}
 .plan-card.featured{border-color:var(--gold); box-shadow:var(--shadow-soft);}
-.plan-card .price{font-family:'AppTitles'; font-size:28px; margin:10px 0;}
+.plan-card .price{font-family:'AppTitles','AppTitles2'; font-size:28px; margin:10px 0;}
 
 /* ---- Certificate ---- */
 .cert-box{border:2px solid var(--gold); border-radius:var(--radius-lg); padding:40px; text-align:center; background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); position:relative; box-shadow:var(--shadow-lift);}
@@ -362,14 +364,14 @@ img{max-width:100%; display:block;}
 .cert-card{background:#FFFFFF; border:1px solid var(--line); border-radius:16px; padding:44px 48px; aspect-ratio:1.55; display:flex; flex-direction:column; box-shadow:var(--shadow-lift); margin-bottom:20px; position:relative; overflow:hidden;}
 .cert-card::before{content:''; position:absolute; inset:10px; border:1px solid #E7E2D6; border-radius:10px; pointer-events:none;}
 .cert-card-top{margin-bottom:28px; display:flex; align-items:center; justify-content:space-between; gap:10px;}
-.cert-wordmark{font-family:'AppTitles'; font-size:22px; font-weight:700; letter-spacing:-.02em; color:#0E1116; text-transform:lowercase;}
+.cert-wordmark{font-family:'AppTitles','AppTitles2'; font-size:22px; font-weight:700; letter-spacing:-.02em; color:#0E1116; text-transform:lowercase;}
 .cert-wordmark-img{height:26px; width:auto; -webkit-user-select:none; user-select:none;}
-.cert-card-heading{font-family:'AppTitles'; font-size:clamp(24px,3.4vw,34px); font-weight:800; color:#155FDB; margin-bottom:20px;}
-.cert-card-line-label{font-family:'AppBody'; font-size:15px; font-weight:700; color:#0E1116;}
-.cert-card-filled{font-family:'AppTitles'; font-size:19px; color:#0E1116; border-bottom:1.5px solid #0E1116; padding-bottom:10px; margin-top:8px; min-height:30px;}
-.cert-card-skills{font-family:'AppBody'; font-size:15px; font-weight:700; color:#0E1116; margin-top:24px;}
+.cert-card-heading{font-family:'AppTitles','AppTitles2'; font-size:clamp(24px,3.4vw,34px); font-weight:800; color:#155FDB; margin-bottom:20px;}
+.cert-card-line-label{font-family:'AppBody','AppBody2'; font-size:15px; font-weight:700; color:#0E1116;}
+.cert-card-filled{font-family:'AppTitles','AppTitles2'; font-size:19px; color:#0E1116; border-bottom:1.5px solid #0E1116; padding-bottom:10px; margin-top:8px; min-height:30px;}
+.cert-card-skills{font-family:'AppBody','AppBody2'; font-size:15px; font-weight:700; color:#0E1116; margin-top:24px;}
 .cert-card-skills-tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
-.cert-card-skills-tags span{font-family:'AppBody'; font-size:12px; font-weight:600; color:#0E1116; background:#F3F1EA; border:1px solid var(--line); border-radius:100px; padding:4px 12px; white-space:nowrap;}
+.cert-card-skills-tags span{font-family:'AppBody','AppBody2'; font-size:12px; font-weight:600; color:#0E1116; background:#F3F1EA; border:1px solid var(--line); border-radius:100px; padding:4px 12px; white-space:nowrap;}
 
 /* ---- Track completion certificate (medal badge template) ---- */
 .cert-track-body{display:flex; align-items:center; gap:28px; flex:1;}
@@ -448,7 +450,7 @@ img{max-width:100%; display:block;}
 .stat-card{background:var(--glass-bg); backdrop-filter:var(--glass-blur); -webkit-backdrop-filter:var(--glass-blur); border:1px solid var(--glass-border); border-radius:var(--radius-md); padding:18px 14px; text-align:center; box-shadow:var(--shadow-soft);}
 .stat-icon{color:var(--emerald); margin-bottom:8px; display:flex; justify-content:center;}
 .stat-icon .icon{width:22px; height:22px;}
-.stat-value{font-family:'AppTitles'; font-size:22px;}
+.stat-value{font-family:'AppTitles','AppTitles2'; font-size:22px;}
 .stat-label{font-size:11px; color:var(--ink-soft); margin-top:4px;}
 @media(max-width:600px){.stat-row{grid-template-columns:repeat(2,1fr);}}
 
@@ -661,9 +663,10 @@ p, .hint, li, .info span, .info h4, .info p, .kicker, blockquote{ white-space: p
    Sarmad identity v2 — pure black, warm cream, soft ivory, warm gray, muted gold
    ===================================================================== */
 :root{ --emerald:#111111; --emerald-soft:#EFE8D6; --surface-2:#F7F3EA; --gold:#C6A66B; --ink-soft:#77756F; }
-html,body,button,input,select,textarea{ font-family:'Tajawal','IBM Plex Sans Arabic',Inter,system-ui,sans-serif; }
-h1,h2,h3,h4{ font-family:'Tajawal','IBM Plex Sans Arabic',Inter,system-ui,sans-serif; font-weight:800; letter-spacing:-.2px; }
 body{ background:#F7F3EA; color:#111111; }
 .btn-primary{ color:#F7F3EA; }
 a{ text-underline-offset:3px; }
 
+
+/* dates use the platform's date font */
+time,.date,.when,.post-date,.cert-card-date-top,.audio-time,.quiz-timer,.meta-date,[data-date]{ font-family:'AppDate','AppSub',sans-serif; }
